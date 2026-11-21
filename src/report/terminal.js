@@ -86,9 +86,16 @@ export function renderTerminal(report, { technical = false, color = false } = {}
   if (report.live.ran) {
     const l = report.live;
     out.push(
-      `  ${p.dim(`Live check (ownership proven by ${l.ownership}): ${plural(l.probed, 'table')} asked, ${l.open} open, ${l.lockedOrEmpty} locked or empty, ${l.locked} locked, ${l.notExposed} not exposed${l.errors ? `, ${l.errors} errors` : ''}.`)}`,
+      `  ${p.dim(`Live check (ownership proven by ${l.ownership}): ${plural(l.probed, "table or view", "tables and views")} asked, ${l.open} open, ${l.lockedOrEmpty} locked or empty, ${l.locked} locked, ${l.notExposed} not exposed${l.errors ? `, ${l.errors} errors` : ''}.`)}`,
     );
     if (l.lockedOrEmpty) out.push(`  ${p.dim('"Locked or empty": from outside, an empty table and a locked one look the same.')}`);
+    if (l.coverage.complete) {
+      out.push(`  ${p.dim(`Table list from the ${l.coverage.source}: ${l.coverage.fromMigrations} from your migrations, ${l.coverage.outsideMigrations} created outside them.`)}`);
+    } else {
+      out.push(
+        `  ${p.yellow('!')} ${p.yellow(`Live check only covered the ${l.coverage.fromMigrations} tables in your migrations. The project wouldn't list its tables (${l.coverage.reason}), so anything created outside migrations, like a backup copy made by hand, was NOT checked. Set SUPABASE_ACCESS_TOKEN to cover everything.`)}`,
+      );
+    }
   } else {
     out.push(`  ${p.dim('Live check not run. Add --live to test your running project too.')}`);
   }

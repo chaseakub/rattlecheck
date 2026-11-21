@@ -61,11 +61,14 @@ function summarize(report) {
     lines.push('', `[${f.severity.toUpperCase()}] ${f.rule} ${f.name}${f.detail ? ` (${f.detail})` : ''}`, f.plain, `What to do: ${f.todo}`, `Location: ${f.file ?? 'live project'}${f.line ? `:${f.line}` : ''}`, 'Fix SQL (put in a NEW migration):', f.fix);
   }
   if (!report.coverage.ok) lines.push('', 'WARNING: migration files were found but nothing could be parsed. Do not trust this result.');
+  if (report.live.ran && !report.live.coverage.complete) {
+    lines.push('', `WARNING: the live check only covered the ${report.live.coverage.fromMigrations} tables found in migrations (${report.live.coverage.reason}). Tables created outside migrations were not checked. Tell the user; do not report this as a full all-clear.`);
+  }
   for (const w of report.configWarnings) lines.push('', `Config: ${w}`);
   return lines.join('\n');
 }
 
-export async function callTool(name, args = {}, { cwd = process.cwd(), env = process.env } = {}) {
+export async function callTool(name, args = {}, { cwd = process.cwd(), env = process.env, fetchImpl = globalThis.fetch } = {}) {
   if (name === 'list_rules') {
     const rules = ALL_RULES.map((r) => ({ id: r.id, severity: r.severity, title: r.title, live: Boolean(r.live) }));
     return { content: [{ type: 'text', text: rules.map((r) => `${r.id} ${r.severity} ${r.title}`).join('\n') }], structuredContent: { rules } };
@@ -80,7 +83,7 @@ export async function callTool(name, args = {}, { cwd = process.cwd(), env = pro
     if (args.path !== undefined && typeof args.path !== 'string') return { content: [{ type: 'text', text: '"path" must be a string.' }], isError: true };
     if (args.live !== undefined && typeof args.live !== 'boolean') return { content: [{ type: 'text', text: '"live" must be true or false.' }], isError: true };
     try {
-      const report = await scan({ root: path.resolve(cwd, args.path ?? '.'), live: args.live === true, env });
+      const report = await scan({ root: path.resolve(cwd, args.path ?? '.'), live: args.live === true, env, fetchImpl });
       return { content: [{ type: 'text', text: summarize(report) }], structuredContent: report };
     } catch (e) {
       const known = e instanceof ScanError || e instanceof ConfigError;

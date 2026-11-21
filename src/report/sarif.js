@@ -37,7 +37,7 @@ export function renderSarif(report) {
       {
         tool: { driver: { name: 'rattlecheck', version: report.tool.version, semanticVersion: report.tool.version, rules } },
         results,
-        properties: { grade: report.grade.letter, doors: report.doors, coverage: report.coverage },
+        properties: { grade: report.grade.letter, doors: report.doors, coverage: report.coverage, live: report.live },
       },
     ],
   };

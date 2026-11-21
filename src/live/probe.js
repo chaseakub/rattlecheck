@@ -12,19 +12,24 @@
 // same, and claiming otherwise would be reporting an instrument we can't trust.
 import { authHeaders, checkTarget } from './env.js';
 
+// PostgREST's own table list. It only lists what the asking role can reach,
+// which makes it complete for the public key's point of view, when the
+// project serves it at all (many no longer do to the public key).
 async function discoverPublicTables(base, headers, fetchImpl) {
   try {
     const res = await fetchImpl(`${base}/rest/v1/`, { headers: { ...headers, Accept: 'application/openapi+json' }, redirect: 'manual' });
     if (res.status !== 200) {
       await res.body?.cancel?.();
-      return [];
+      return { ok: false, names: [] };
     }
     const spec = await res.json();
-    return Object.keys(spec.paths ?? {})
+    if (!spec || typeof spec.paths !== 'object') return { ok: false, names: [] };
+    const names = Object.keys(spec.paths)
       .filter((p) => p !== '/' && !p.startsWith('/rpc/'))
       .map((p) => `public.${p.slice(1)}`);
+    return { ok: true, names };
   } catch {
-    return [];
+    return { ok: false, names: [] };
   }
 }
 
@@ -39,8 +44,8 @@ export async function probeTables({ url, anonKey, tables, fetchImpl = globalThis
   if (!target.ok) throw new Error(target.reason);
   const base = target.base;
   const headers = { ...authHeaders(anonKey), 'User-Agent': userAgent };
-  const discovered = await discoverPublicTables(base, headers, fetchImpl);
-  const all = [...new Set([...tables, ...discovered])].sort();
+  const apiList = await discoverPublicTables(base, headers, fetchImpl);
+  const all = [...new Set([...tables, ...apiList.names])].sort();
 
   const results = [];
   let next = 0;
@@ -71,5 +76,5 @@ export async function probeTables({ url, anonKey, tables, fetchImpl = globalThis
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, all.length) }, worker));
   results.sort((a, b) => a.table.localeCompare(b.table));
-  return { results, discovered: discovered.length };
+  return { results, apiList };
 }

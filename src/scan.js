@@ -7,6 +7,7 @@ import { countBySeverity, gradeFor, GRADES, OPEN_SEVERITIES } from './report/gra
 import { readProjectEnv, looksSecret } from './live/env.js';
 import { proveOwnership } from './live/ownership.js';
 import { probeTables } from './live/probe.js';
+import { listExposedObjects } from './live/catalog.js';
 import { tableExposure } from './model.js';
 import { VERSION, USER_AGENT } from './version.js';
 
@@ -77,7 +78,13 @@ export async function scan({ root = '.', live = false, configPath, env = process
         4,
       );
     }
-    const candidates = [...model.tables.values()].filter((t) => tableExposure(model, t).exposed).map((t) => t.key);
+    const fromMigrations = [...model.tables.values()].filter((t) => tableExposure(model, t).exposed).map((t) => t.key);
+    // The live check has to ask about everything the project serves, not just
+    // what the migrations know about. See src/live/catalog.js.
+    const catalog = own.method === 'access-token'
+      ? await listExposedObjects({ ref: own.ref, accessToken: projectEnv.accessToken, schemas: exposedSchemas, fetchImpl, userAgent: USER_AGENT })
+      : { ok: false, names: [], reason: 'proved ownership with a service key; the full table list needs SUPABASE_ACCESS_TOKEN' };
+    const candidates = [...new Set([...fromMigrations, ...catalog.names])];
     const probe = await probeTables({ url: own.base, anonKey: projectEnv.anonKey, tables: candidates, fetchImpl, userAgent: USER_AGENT });
     for (const rule of LIVE_RULES) {
       const r = rule.check(probe, model);
@@ -85,9 +92,20 @@ export async function scan({ root = '.', live = false, configPath, env = process
       for (const f of r.findings) raw.push(decorate(rule, f, root, migrationsDir));
     }
     const by = (s) => probe.results.filter((x) => x.state === s).length;
+    const known = new Set(fromMigrations);
+    const complete = catalog.ok || probe.apiList.ok;
     liveReport = {
       ran: true,
       ownership: own.method,
+      // How the list of things to ask about was built. complete=false means
+      // objects created outside migrations may exist and were NOT checked.
+      coverage: {
+        complete,
+        source: catalog.ok ? 'project catalog (read-only)' : probe.apiList.ok ? 'API table list' : 'migrations only',
+        fromMigrations: fromMigrations.length,
+        outsideMigrations: probe.results.filter((x) => !known.has(x.table)).length,
+        ...(complete ? {} : { reason: catalog.reason }),
+      },
       probed: probe.results.length,
       open: by('open'),
       lockedOrEmpty: by('locked-or-empty'),
