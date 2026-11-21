@@ -8,8 +8,6 @@ At closing time, a good manager walks the building and rattles every door to mak
 npx rattlecheck
 ```
 
-> Status: 0.1, pre-release. Not yet published to npm.
-
 ```
   rattlecheck 0.1.0  rattle every door you own
 

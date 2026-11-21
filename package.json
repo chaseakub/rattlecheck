@@ -2,6 +2,14 @@
   "name": "rattlecheck",
   "version": "0.1.0",
   "description": "Rattle every door you own. Finds the open doors in your Supabase app before someone else does.",
+  "homepage": "https://github.com/chaseakub/rattlecheck#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chaseakub/rattlecheck.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chaseakub/rattlecheck/issues"
+  },
   "type": "module",
   "bin": {
     "rattlecheck": "bin/rattlecheck.js",
@@ -16,6 +24,7 @@
     "docs",
     "integrations",
     "LICENSE",
+    "NOTICE",
     "README.md"
   ],
   "engines": {
