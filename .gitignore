@@ -1,0 +1,9 @@
+node_modules/
+.preview/
+rattlecheck-badge.svg
+rattlecheck-card.svg
+rattlecheck-fixes.sql
+*.sarif
+.env
+.env.*
+.DS_Store

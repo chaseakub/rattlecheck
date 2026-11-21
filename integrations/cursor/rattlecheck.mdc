@@ -1,0 +1,13 @@
+---
+description: Check Supabase security with rattlecheck before deploying or after changing migrations
+globs: supabase/migrations/**/*.sql
+alwaysApply: false
+---
+
+When you create or change a file in `supabase/migrations/`, or before a deploy:
+
+1. Run `npx rattlecheck --json` from the project root.
+2. Put each finding's `fix` SQL into a NEW migration file. Never edit migrations that already ran, and never run SQL against production yourself.
+3. Run it again until the grade is A.
+4. If a finding is intentional, ask the user before adding an allow entry with a written reason to `rattlecheck.config.json`.
+5. Tell the user what you found and fixed using each finding's `plain` text.

@@ -1,0 +1,38 @@
+{
+  "name": "rattlecheck",
+  "version": "0.1.0",
+  "description": "Rattle every door you own. Finds the open doors in your Supabase app before someone else does.",
+  "type": "module",
+  "bin": {
+    "rattlecheck": "bin/rattlecheck.js",
+    "rattle": "bin/rattlecheck.js"
+  },
+  "exports": {
+    ".": "./src/scan.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "integrations",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "keywords": [
+    "supabase",
+    "security",
+    "rls",
+    "row-level-security",
+    "postgres",
+    "scanner",
+    "mcp",
+    "sarif"
+  ],
+  "license": "Apache-2.0"
+}
