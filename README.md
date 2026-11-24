@@ -9,7 +9,7 @@ npx rattlecheck
 ```
 
 ```
-  rattlecheck 0.1.0  rattle every door you own
+  rattlecheck 0.1.1  rattle every door you own
 
   ┌──────────────────────────────────────────────┐
   │ GRADE  F  Wide open                          │
