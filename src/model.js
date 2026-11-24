@@ -10,15 +10,18 @@
 // When the replay can't be sure, it leans toward "reachable". For a security
 // tool a missed hole is worse than a question.
 //
-// This is a static model. It cannot see inside dynamic SQL (EXECUTE format(...))
-// and it does not know what was changed by hand in a dashboard. The live probe
-// exists for the second problem; `defaults: "clean"` in the config exists for
-// projects whose baseline revokes default grants through dynamic SQL.
+// This is a static model. Inside a DO block it replays only the statements that
+// are certain to run and whose text it can work out (see sql/doblock.js); the
+// rest are counted in coverage.doBlocks.skipped. It does not know what was
+// changed by hand in a dashboard. The live probe exists for that; `defaults:
+// "clean"` in the config exists for baselines whose revoke of the default
+// grants still can't be followed.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { splitStatements, stripComments, readQualifiedName, readParenGroup, lineIndex, quotedEnd, blankLiterals } from './sql/statements.js';
 import { normaliseArgs, signatureKey } from './sql/signature.js';
+import { replayableFromDo, reopens } from './sql/doblock.js';
 
 const PRIVS = ['select', 'insert', 'update', 'delete'];
 const API_ROLES = ['anon', 'authenticated'];
@@ -212,7 +215,7 @@ export function buildModel(migrations, opts = {}) {
   const tables = new Map();
   const functions = new Map();
   const triggers = [];
-  const coverage = { files: migrations.length, statements: 0, tablesSeen: 0, functionsSeen: 0, policiesSeen: 0 };
+  const coverage = { files: migrations.length, statements: 0, tablesSeen: 0, functionsSeen: 0, policiesSeen: 0, doBlocks: { seen: 0, replayed: 0, skipped: 0 } };
 
   // Schema USAGE per role. Without USAGE a role can't reach anything inside the
   // schema. public starts usable by everyone; a schema created in a migration
@@ -253,7 +256,17 @@ export function buildModel(migrations, opts = {}) {
   const exists = (s) => knownSchemas.has(s);
   let sessionSchema = 'public';
   let localSchema = null;
-  const schemaOf = (n) => (n.schema ?? localSchema ?? sessionSchema).toLowerCase();
+  // SET ROLE / SET SESSION AUTHORIZATION: statements now run as some other
+  // role, so "the migration role's" default privileges are not the ones changing.
+  let roleChanged = false;
+  // Set when a DO block may have changed search_path in a way that can't be
+  // read. While it is set, an unqualified name in a statement that LOCKS
+  // something matches nothing, so a lock aimed at "t" is not credited to
+  // public.t. Statements that create or open something still resolve the usual
+  // way, because a missed door is worse than a question.
+  let unknownPath = false;
+  let pathSentinel = false; // decided per statement
+  const schemaOf = (n) => (n.schema ?? (pathSentinel ? '\u0000unknown' : (localSchema ?? sessionSchema))).toLowerCase();
   const tkey = (n) => `${schemaOf(n)}.${n.name}`;
 
   function addTable(n, file, line, kind) {
@@ -277,35 +290,94 @@ export function buildModel(migrations, opts = {}) {
     coverage.tablesSeen++;
   }
 
+  // Every top-level statement, followed by whatever a DO block is certain to
+  // run. The DO statement itself is yielded too; nothing below matches it.
+  const everCreated = new Set();
+  function* replayOrder(source) {
+    for (const st of splitStatements(source)) {
+      // Every function or procedure any statement creates, wherever the CREATE
+      // sits: in a block that was not trusted, or in text built at run time.
+      for (const m of st.sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+((?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)(?:\s*\.\s*(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*))?)/gi)) {
+        const last = m[1].split('.').pop().trim();
+        everCreated.add(last.startsWith('"') ? last.slice(1, -1) : last.toLowerCase());
+      }
+      yield st;
+      let inner;
+      try {
+        // After SET ROLE the session role is not the migration role any more.
+        const own = new Set([...functions.values()].map((f) => f.name));
+        for (const name of everCreated) own.add(name);
+        inner = replayableFromDo(stripComments(st.sql).trimStart(), { currentUser: roleChanged ? null : migrationRoles[0], isUserFunction: (name) => own.has(name) });
+      } catch {
+        inner = { statements: [], skipped: 1, followed: false, sessionChanged: true }; // never let one odd block stop the scan
+      }
+      if (!inner) continue;
+      coverage.doBlocks.seen++;
+      coverage.doBlocks.replayed += inner.statements.length;
+      coverage.doBlocks.skipped += inner.skipped;
+      for (const sql of inner.statements) yield { sql, index: st.index };
+      // The block may have left the session on another role or search_path.
+      if (inner.sessionChanged) {
+        roleChanged = true;
+        unknownPath = true;
+      }
+    }
+  }
+
   for (const { file, sql: source } of migrations) {
     const lineAt = lineIndex(source);
     sessionSchema = 'public'; // each migration file runs in its own session
     localSchema = null;
-    for (const { sql: rawStmt, index } of splitStatements(source)) {
+    roleChanged = false;
+    unknownPath = false;
+    for (const { sql: rawStmt, index } of replayOrder(source)) {
       const head = stripComments(rawStmt).trimStart();
       if (!head) continue;
       coverage.statements++;
       const line = lineAt(index);
       const flat = blankLiterals(head); // for keyword tests that must not see string contents
+      pathSentinel = unknownPath && !/^CREATE\b/i.test(head) && !reopens(head);
+
+      // ── SET ROLE (decides whose default privileges a bare ALTER DEFAULT PRIVILEGES changes) ──
+      // Checked before search_path, so one SELECT that sets both is not missed.
+      if (/set_config\(\s*'(role|session_authorization)'/i.test(head)) roleChanged = true;
+      const sr = /^SET\s+(?:SESSION\s+|LOCAL\s+)?(?:"?ROLE"?|SESSION\s+AUTHORIZATION)\s*(?:=|\bTO\b)?\s*([^\s;]+)/i.exec(head);
+      if (sr) {
+        roleChanged = !/^["']?(NONE|DEFAULT)["']?$/i.test(sr[1]);
+        continue;
+      }
+      if (/^RESET\s+("?ROLE"?|SESSION\s+AUTHORIZATION)\b/i.test(head)) {
+        roleChanged = false;
+        continue;
+      }
 
       // ── SET search_path (decides where unqualified names land) ───────────
       const sp = /^SET\s+(SESSION\s+|LOCAL\s+)?"?search_path"?\s*(?:=|TO)\s*([\s\S]*)$/i.exec(head);
       if (sp) {
         const s = firstSchema(sp[2], exists) ?? 'public';
+        // SET LOCAL ends with the transaction; the unknown session path is still underneath.
         if (/^LOCAL/i.test(sp[1] ?? '')) localSchema = s;
-        else sessionSchema = s;
+        else {
+          sessionSchema = s;
+          unknownPath = false;
+        }
         continue;
       }
       const sc = /set_config\(\s*'search_path'\s*,\s*'([^']*)'\s*,\s*(true|false)\s*\)/i.exec(head);
       if (/^SELECT\b/i.test(head) && sc) {
         const s = firstSchema(sc[1], exists) ?? 'public';
         if (sc[2].toLowerCase() === 'true') localSchema = s;
-        else sessionSchema = s;
+        else {
+          sessionSchema = s;
+          unknownPath = false;
+        }
         continue;
       }
       if (/^RESET\s+("?search_path"?|ALL)\b/i.test(head)) {
         sessionSchema = 'public';
         localSchema = null;
+        unknownPath = false;
+        if (/^RESET\s+ALL\b/i.test(head)) roleChanged = false;
         continue;
       }
       if (/^(COMMIT|END|ABORT)\b/i.test(head) || (/^ROLLBACK\b/i.test(head) && !/^ROLLBACK\s+(?:WORK\s+|TRANSACTION\s+)?TO\b/i.test(head))) {
@@ -540,6 +612,9 @@ export function buildModel(migrations, opts = {}) {
         if (!action) continue;
         const isRevoke = action[1].toUpperCase() === 'REVOKE';
         const onTables = action[3].toUpperCase() === 'TABLES';
+        // Without FOR ROLE it changes the CURRENT role's defaults. After SET ROLE
+        // that is not the role creating objects, so a revoke protects nothing here.
+        if (!forRole && roleChanged && isRevoke) continue;
         const roleText = isRevoke ? (/\bFROM\s+([\s\S]*)$/i.exec(head)?.[1] ?? '') : (/\bTO\s+([\s\S]*)$/i.exec(head)?.[1] ?? '');
         const roles = rolesIn(roleText);
         const privs = parsePrivs(action[2]).table;

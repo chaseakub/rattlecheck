@@ -83,6 +83,11 @@ export function renderTerminal(report, { technical = false, color = false } = {}
   out.push(
     `  ${p.dim(`Checked ${plural(c.files, 'migration file')}, ${plural(c.statements, 'statement')}: ${plural(c.tables, 'table')}, ${plural(c.functions, 'function')}. Exposed schemas: ${c.exposedSchemas.join(', ')}.`)}`,
   );
+  if (c.doBlocks?.skipped) {
+    out.push(
+      `  ${p.dim(`${plural(c.doBlocks.skipped, 'statement')} inside DO blocks could not be followed (conditional, or built at run time) and ${c.doBlocks.skipped === 1 ? 'was' : 'were'} not counted. Run with --live to check what the project actually serves.`)}`,
+    );
+  }
   if (report.live.ran) {
     const l = report.live;
     out.push(

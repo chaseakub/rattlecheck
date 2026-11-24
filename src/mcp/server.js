@@ -64,6 +64,9 @@ function summarize(report) {
   if (report.live.ran && !report.live.coverage.complete) {
     lines.push('', `WARNING: the live check only covered the ${report.live.coverage.fromMigrations} tables found in migrations (${report.live.coverage.reason}). Tables created outside migrations were not checked. Tell the user; do not report this as a full all-clear.`);
   }
+  if (report.coverage.doBlocks?.skipped) {
+    lines.push('', `Note: ${report.coverage.doBlocks.skipped} statement(s) inside DO blocks could not be followed (conditional, or built at run time) and were not counted. A live scan checks what the project actually serves.`);
+  }
   for (const w of report.configWarnings) lines.push('', `Config: ${w}`);
   return lines.join('\n');
 }

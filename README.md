@@ -140,7 +140,7 @@ Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3
 ```
 
 - **`allow`**: some doors are meant to be open, like a public menu. Every entry needs a written reason. Entries that no longer match anything are reported, so an old exception can't quietly cover something new.
-- **`defaults`**: rattlecheck assumes Supabase's stock privileges, where new tables and functions in `public` are open to `anon` and `authenticated` until you revoke them. If your baseline migration revokes those defaults through dynamic SQL that a static reader can't see, set `"clean"`, or `{ "functions": "clean", "tables": "supabase-stock" }`.
+- **`defaults`**: rattlecheck assumes Supabase's stock privileges, where new tables and functions in `public` are open to `anon` and `authenticated` until you revoke them. A baseline that revokes those defaults inside a `DO` block is followed when the statement is certain to run and its text can be worked out (string literals, `format()`, `current_user`). If yours builds the revoke some other way, set `"clean"`, or `{ "functions": "clean", "tables": "supabase-stock" }`.
 - **`exposedSchemas`**: read from `supabase/config.toml` (`[api] schemas`) by default.
 - **`migrationRoles`**: the roles your migrations run as (default `["postgres"]`). `ALTER DEFAULT PRIVILEGES FOR ROLE` only counts when it names one of them.
 
@@ -167,7 +167,7 @@ Every finding is labeled with the controls auditors and agencies already use, so
 
 ## What it doesn't check yet
 
-rattlecheck 0.1 reads Supabase migrations and, with `--live`, your running project's tables. It does not yet look at views, storage buckets, edge functions, auth settings, or secrets leaked into your website's code. It can't see inside dynamic SQL (`EXECUTE format(...)`), which is one more reason to run `--live`.
+rattlecheck 0.1 reads Supabase migrations and, with `--live`, your running project's tables. It does not yet look at views, storage buckets, edge functions, auth settings, or secrets leaked into your website's code. Inside a `DO` block it replays only what is certain to run: statements at the top level of the block, with text it can work out. Anything conditional, looped, or built from data at run time is skipped and counted in the report, which is one more reason to run `--live`.
 
 ## License
 
