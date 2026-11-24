@@ -14,7 +14,7 @@ function painter(useColor) {
 }
 
 function gradeCode(letter) {
-  return { A: 32, B: 32, C: 33, D: 33, F: 31 }[letter];
+  return { A: 32, B: 32, C: 33, D: 33, F: 31, 'N/A': 90 }[letter];
 }
 
 function box(lines, width) {
@@ -45,7 +45,7 @@ export function renderTerminal(report, { technical = false, color = false } = {}
   out.push(...card.map((l) => `  ${l}`));
   out.push('');
 
-  if (report.findings.length === 0) {
+  if (report.findings.length === 0 && report.doors.checked > 0 && report.coverage.ok) {
     out.push(`  ${p.green('✓')} Nothing open. Every door rattlecheck knows how to check is shut.`);
     out.push('');
   }

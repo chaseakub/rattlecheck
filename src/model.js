@@ -282,9 +282,10 @@ export function buildModel(migrations, opts = {}) {
     sessionSchema = 'public'; // each migration file runs in its own session
     localSchema = null;
     for (const { sql: rawStmt, index } of splitStatements(source)) {
+      const head = stripComments(rawStmt).trimStart();
+      if (!head) continue;
       coverage.statements++;
       const line = lineAt(index);
-      const head = stripComments(rawStmt).replace(/^\s+/, '');
       const flat = blankLiterals(head); // for keyword tests that must not see string contents
 
       // ── SET search_path (decides where unqualified names land) ───────────

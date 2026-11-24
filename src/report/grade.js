@@ -1,6 +1,7 @@
 // The one place the grade is decided. Cards, badges, terminal output and the
 // MCP server all read from here, so they cannot disagree.
 export const GRADES = {
+  'N/A': { label: 'No objects checked', color: '#656b73' },
   A: { label: 'Locked tight', color: '#1a9e55' },
   B: { label: 'Mostly locked', color: '#6fa832' },
   C: { label: 'Needs work', color: '#e0a100' },

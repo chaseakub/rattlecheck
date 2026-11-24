@@ -136,7 +136,7 @@ export async function scan({ root = '.', live = false, configPath, env = process
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.rule.localeCompare(b.rule) || a.name.localeCompare(b.name));
 
   const counts = countBySeverity(findings);
-  const letter = gradeFor(counts);
+  const letter = checked.size === 0 ? 'N/A' : gradeFor(counts);
   const open = new Set(findings.filter((f) => OPEN_SEVERITIES.has(f.severity)).map((f) => f.object));
 
   const coverageOk = !(migrations.length > 0 && model.coverage.statements === 0);

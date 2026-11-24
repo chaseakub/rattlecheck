@@ -8,14 +8,19 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export function renderCard(report) {
   const g = report.grade;
   const { checked, open } = report.doors;
-  const headline = open === 0 ? 'Every door locked.' : open === 1 ? '1 door open.' : `${open} doors open.`;
-  const sub =
+  let headline = open === 0 ? 'Every door locked.' : open === 1 ? '1 door open.' : `${open} doors open.`;
+  let sub =
     open === 0
       ? `${checked.toLocaleString('en-US')} doors checked. Nothing gave.`
       : `${checked.toLocaleString('en-US')} doors checked. Fixing ${open === 1 ? 'it' : 'them'} now.`;
 
+  if (checked === 0) {
+    headline = g.label + '.';
+    sub = 'Run the check on migrations that define tables or functions.';
+  }
+
   // A row of small doors: open ones drawn ajar in the grade color.
-  const doorCount = Math.min(24, Math.max(checked, 1));
+  const doorCount = Math.min(24, checked);
   const openCount = Math.min(open, doorCount);
   const doors = [];
   for (let i = 0; i < doorCount; i++) {
@@ -36,7 +41,7 @@ export function renderCard(report) {
   <text x="96" y="160" fill="#8b8b91" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="24">Rattle every door you own.</text>
 
   <circle cx="1010" cy="300" r="118" fill="none" stroke="${g.color}" stroke-width="10"/>
-  <text x="1010" y="345" text-anchor="middle" fill="${g.color}" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="132" font-weight="800">${g.letter}</text>
+  <text x="1010" y="345" text-anchor="middle" fill="${g.color}" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="${checked === 0 ? 86 : 132}" font-weight="800">${g.letter}</text>
   <text x="1010" y="458" text-anchor="middle" fill="#c9c9ce" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="26" font-weight="600">${esc(g.label)}</text>
 
   <text x="96" y="318" fill="#f4f4f5" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="76" font-weight="800">${esc(headline)}</text>

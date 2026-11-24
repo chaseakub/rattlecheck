@@ -54,7 +54,7 @@ Every rule in rattlecheck comes from a real incident in a production app:
 
 rattlecheck doesn't grep your files. It replays every migration in order, statement by statement, the way Postgres would, so it knows the current state: a revoke from March doesn't count if the function was dropped and re-created in June, and a policy that was later dropped protects nothing.
 
-Grades: **A** nothing open, **B** only things worth a look, **C** one high finding, **D** two or more, **F** anything critical.
+Grades: **A** nothing open, **B** only things worth a look, **C** one high finding, **D** two or more, **F** anything critical. **N/A** means no objects were checked. Empty or comment-only migration files on their own produce exit code 3.
 
 ## For coding agents
 

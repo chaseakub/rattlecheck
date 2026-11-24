@@ -100,6 +100,33 @@ test('CLI exit codes: 1 for open doors, 0 for clean, 2 for no migrations', async
   }
 });
 
+test('comment-only migrations return a coverage error and never display a passing grade', async () => {
+  const sql = '-- First note\n; /* Another note */';
+  const root = project(sql);
+  try {
+    const out = sink();
+    assert.equal(await main([root, '--json'], { stdout: out, stderr: sink(), env: {} }), 3);
+    const report = JSON.parse(out.text);
+    assert.equal(report.coverage.statements, 0);
+    assert.equal(report.coverage.ok, false);
+    assert.equal(report.grade.letter, 'N/A');
+    assert.doesNotMatch(renderTerminal(report), /Locked tight|Nothing open/);
+    assert.match(renderCard(report), /No objects checked/);
+    assert.match(renderBadge(report), /N\/A/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('SQL without objects has no grade and comments do not affect valid scans', async () => {
+  const noObjects = await scanSql('SELECT 1;');
+  assert.equal(noObjects.coverage.ok, true);
+  assert.equal(noObjects.grade.letter, 'N/A');
+  const rated = await scanSql('-- intro\nCREATE TABLE public.example (id integer); ALTER TABLE public.example ENABLE ROW LEVEL SECURITY; -- trailing note');
+  assert.equal(rated.coverage.statements, 2);
+  assert.equal(rated.grade.letter, 'A');
+});
+
 test('CLI --json emits the versioned report schema', async () => {
   const root = project(BAD);
   try {
