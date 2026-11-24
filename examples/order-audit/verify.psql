@@ -1,0 +1,57 @@
+-- Run with psql on a disposable, empty PostgreSQL database.
+-- Recreate only the identity primitives needed by this fictional fixture.
+\set ON_ERROR_STOP on
+begin;
+create role authenticated;
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$
+  select current_setting('request.jwt.claim.sub')::uuid
+$$;
+grant usage on schema auth to authenticated;
+\ir 001_setup.sql
+insert into public.orders values (1, '00000000-0000-4000-8000-000000000001', 'original');
+set local request.jwt.claim.sub = '00000000-0000-4000-8000-000000000001';
+
+\ir 002_audit.sql
+set local role authenticated;
+do $$
+begin
+  update public.orders set note = 'before fix' where id = 1;
+  raise exception 'Expected the audit insert to reject the customer update';
+exception when insufficient_privilege then
+  if sqlerrm not like '%row-level security policy for table "order_events"%' then raise; end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select note from public.orders where id = 1) is distinct from 'original'
+     or exists (select from public.order_events) then
+    raise exception 'The rejected save should leave both tables unchanged';
+  end if;
+end;
+$$;
+\echo Before fix: customer save rolled back; no audit entry.
+
+\ir 003_fix.sql
+set local role authenticated;
+update public.orders set note = 'after fix' where id = 1;
+do $$
+begin
+  insert into public.order_events values (1);
+  raise exception 'Customers must not be able to append audit entries directly';
+exception when insufficient_privilege then
+  if sqlerrm not like '%row-level security policy for table "order_events"%' then raise; end if;
+end;
+$$;
+reset role;
+do $$
+begin
+  if (select note from public.orders where id = 1) is distinct from 'after fix'
+     or (select count(*) from public.order_events where order_id = 1) <> 1 then
+    raise exception 'The customer save must persist with exactly one audit entry';
+  end if;
+end;
+$$;
+\echo After fix: customer save persisted with one audit entry; direct audit inserts still denied.
+rollback;
