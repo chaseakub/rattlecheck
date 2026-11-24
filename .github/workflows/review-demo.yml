@@ -33,7 +33,7 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Verify customer saves before and after the fix
@@ -42,7 +42,7 @@ jobs:
         run: psql -X -h localhost -U postgres -d postgres -f examples/order-audit/verify.psql
       - name: Build the example with RattleCheck
         run: node scripts/build-review-demo.mjs _site
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/main'
         with:
           path: _site
@@ -62,4 +62,4 @@ jobs:
     steps:
       - name: Deploy demo
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
