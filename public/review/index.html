@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f9f7">
+  <title>Would you ship this migration? | RattleCheck</title>
+  <meta name="description" content="Review a Supabase migration. Decide whether a customer's save goes through, then compare your call with RattleCheck.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Would you ship this migration?">
+  <meta property="og:description" content="One Supabase migration. A customer edits an order. Does the save go through? Make your call.">
+  <meta property="og:url" content="https://chaseakub.github.io/rattlecheck/">
+  <meta property="og:image" content="https://chaseakub.github.io/rattlecheck/preview.png">
+  <meta property="og:image:alt" content="RattleCheck asks: Would you ship this migration?">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Would you ship this migration?">
+  <meta name="twitter:description" content="A customer edits an order. Review the SQL and call the outcome.">
+  <meta name="twitter:image" content="https://chaseakub.github.io/rattlecheck/preview.png">
+  <link rel="stylesheet" href="./review.css">
+  <script src="./review.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the review</a>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <span class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>RattleCheck</span>
+      <a class="repo-link" href="https://github.com/chaseakub/rattlecheck">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main id="main" class="wrap">
+    <section class="review" aria-labelledby="challenge-title">
+      <div class="intro">
+        <p class="kicker"><span class="signal"></span> Supabase migration review</p>
+        <h1 id="challenge-title">Would you ship<br>this migration<span>?</span></h1>
+        <p class="lead">A customer can edit their own orders. This migration logs each edit to an audit table. That table has row-level security enabled and no client insert policy.</p>
+      </div>
+      <div class="code-column">
+        <article class="code-card" aria-labelledby="proposal-title">
+          <div class="code-head"><h2 id="proposal-title">Proposed migration</h2><span class="code-type" aria-label="SQL code">SQL</span></div>
+          <p class="filename" id="proposal-file">Loading SQL…</p>
+          <pre class="sql" aria-label="Proposed SQL"><code id="proposal-sql"></code></pre>
+        </article>
+        <details id="setup" hidden>
+          <summary>Inspect the starting schema</summary>
+          <p class="filename" id="setup-file"></p>
+          <pre class="sql" aria-label="Starting schema SQL"><code id="setup-sql"></code></pre>
+        </details>
+      </div>
+      <div id="decision" class="decision">
+        <h2>Does the customer’s save succeed?</h2>
+        <div class="choices">
+          <button class="choice" type="button" data-answer="yes" disabled>Yes, it saves</button>
+          <button class="choice" type="button" data-answer="no" disabled>No, it rolls back</button>
+        </div>
+      </div>
+      <div class="load-error" id="load-error" role="alert" hidden>
+        The example couldn’t load. <button id="retry" class="text-link" type="button">Try again</button> or <a href="https://github.com/chaseakub/rattlecheck">open the repository</a>.
+      </div>
+      <noscript><p>Enable JavaScript to make your call, or <a href="https://github.com/chaseakub/rattlecheck">explore RattleCheck on GitHub</a>.</p></noscript>
+    </section>
+    <section class="result" id="result" aria-labelledby="result-title" hidden>
+      <div class="result-intro">
+        <p class="kicker" id="answer-label"></p>
+        <h2 id="result-title" tabindex="-1">The order update rolls back.</h2>
+        <p>A trigger function runs with the caller’s permissions by default. The customer can update the order, but the audit table rejects the insert. Both writes are in one transaction, so the order edit rolls back too.</p>
+        <p class="finding" id="finding"></p>
+        <div class="result-actions">
+          <a href="#fix" class="ink-button" id="show-fix">See the fix <span aria-hidden="true">↓</span></a>
+          <button type="button" class="text-link" data-share>Copy challenge link</button>
+        </div>
+      </div>
+      <div id="fix" class="fix" hidden>
+        <h2 id="fix-title" tabindex="-1">The fixed migration</h2>
+        <p>The trigger now runs with its owner’s permissions and a pinned search path. The customer can save the order without receiving direct write access to the audit table.</p>
+        <article class="code-card" aria-label="Fixed SQL">
+          <div class="code-head"><span class="code-label">Repair</span><span class="code-type">SQL</span></div>
+          <p class="filename" id="fix-file"></p>
+          <pre class="sql" aria-label="Fix SQL"><code id="fix-sql"></code></pre>
+        </article>
+        <p id="fix-result" class="finding"></p>
+        <div class="result-actions">
+          <button type="button" class="text-link" data-share>Copy challenge link</button>
+          <a id="source" href="https://github.com/chaseakub/rattlecheck">View the source fixture <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/chaseakub/rattlecheck/actions/workflows/review-demo.yml?query=branch%3Amain">See the PostgreSQL test <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+    <section class="try" aria-labelledby="try-title">
+      <div>
+        <h2 id="try-title">Check your own migrations</h2>
+        <p>Run from your project root. The default check reads local SQL files.</p>
+      </div>
+      <button id="install" class="command" type="button" disabled aria-label="Copy install command"><code id="command">npx rattlecheck</code> <span aria-hidden="true">Copy</span></button>
+    </section>
+    <div class="feedback" id="copy-feedback" role="status" aria-live="polite"></div>
+    <div id="copy-manual" class="copy-manual" hidden><label for="copy-value" id="copy-label">Copy manually</label><input id="copy-value" readonly></div>
+  </main>
+</body>
+</html>

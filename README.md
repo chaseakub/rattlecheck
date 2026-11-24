@@ -2,6 +2,8 @@
 
 **Rattle every door you own.**
 
+[**Would you ship this migration?**](https://chaseakub.github.io/rattlecheck/) Review nine lines of SQL, make the call, and see what happens when a customer hits Save. Try it in your browser.
+
 At closing time, a good manager walks the building and rattles every door to make sure it's locked. rattlecheck does that for your app. It checks every table, function, and rule in your Supabase project the way someone on the outside would, tells you in plain English which doors are open, and gives you the exact fix.
 
 ```bash

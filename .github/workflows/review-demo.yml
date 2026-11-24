@@ -1,0 +1,65 @@
+name: Verify and publish the migration review
+on:
+  pull_request:
+    paths: &demo_paths
+      - 'examples/order-audit/**'
+      - 'public/review/**'
+      - 'scripts/build-review-demo.mjs'
+      - 'package.json'
+      - 'src/**'
+      - '.github/workflows/review-demo.yml'
+  push:
+    branches: [main]
+    paths: *demo_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Verify customer saves before and after the fix
+        env:
+          PGPASSWORD: postgres
+        run: psql -X -h localhost -U postgres -d postgres -f examples/order-audit/verify.psql
+      - name: Build the example with RattleCheck
+        run: node scripts/build-review-demo.mjs _site
+      - uses: actions/upload-pages-artifact@v5
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: _site
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy demo
+        id: deploy
+        uses: actions/deploy-pages@v5
