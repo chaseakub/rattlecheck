@@ -7,3 +7,5 @@ rattlecheck-fixes.sql
 .env
 .env.*
 .DS_Store
+.omc/
+.wrangler/
