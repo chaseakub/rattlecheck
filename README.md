@@ -86,6 +86,30 @@ npx rattlecheck --badge    # README badge: rattlecheck-badge.svg
 
 The card shows the grade and counts only. It never names a table, a function, or your project, so a failing card doesn't tell anyone where the hole is.
 
+## Publish a public grade
+
+For an open source project, a grade on your own machine is a claim. A grade anyone can check is evidence.
+
+```bash
+npx rattlecheck --publish
+```
+
+1. Add `"publish": true` to the `rattlecheck.config.json` at the top of your repository, commit it, and push it. For a project in a subfolder, add `"publishDirs": ["apps/api"]` there instead. That line is your consent, and it has to be in the repository itself.
+2. Run `npx rattlecheck --publish` from the project folder.
+3. Paste the badge it prints into your README.
+
+[![rattlecheck](https://rattlecheck.chase-000.workers.dev/badge/chaseakub/rattlecheck.svg?dir=examples%2Fdemo)](https://rattlecheck.chase-000.workers.dev/r/chaseakub/rattlecheck?dir=examples%2Fdemo) is the grade of [`examples/demo`](examples/demo) in this repository.
+
+How it stays honest:
+
+- **The service does the check, not your machine.** `--publish` sends the repository name and the project folder, nothing else. The service fetches the latest commit on the default branch and runs the same check there, so a grade can't be talked up from a laptop.
+- **Opt-in lives at the top of the repository.** A project whose committed config does not opt in is never graded or listed, whoever asks. Remove the line and the next check takes the page down. A config inside a copied or vendored folder can't opt that folder in.
+- **Same settings for everyone.** A public grade takes only the `allow` list from your config. `defaults`, `exposedSchemas` and `migrationRoles` are ignored, so a project can't adjust its way to a better letter. If you rely on one of those locally, the public grade may be lower than the one on your machine.
+- **The page never says which door is open.** It shows the grade, how many doors were checked, how many are open, and how many the project marked as open on purpose. No table names, no function names.
+- **Exceptions are counted in public.** An A with 40 doors "open on purpose" says so on the page.
+
+Public GitHub repositories with up to 1 MB of migrations. The published grade reads the migrations, not the running database, so it is the static check, not `--live`. A repository that uses `export-ignore` in `.gitattributes` is refused, because that can hide files from the check. The service's code is in [`service/`](service).
+
 ## Live check
 
 ```bash
@@ -122,7 +146,7 @@ jobs:
         with: { sarif_file: rattlecheck.sarif }
 ```
 
-Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3` migrations could not be parsed (don't trust the result), `4` live check refused.
+Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3` migrations could not be parsed (don't trust the result), `4` live check refused, `5` publish refused or failed.
 
 `--json` prints a stable, versioned report (`rattlecheck.report/v1`). `--sarif` prints SARIF 2.1.0 for GitHub code scanning and other security tools. `--fix-sql` writes every suggested fix to one file for review.
 
@@ -139,6 +163,7 @@ Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3
 }
 ```
 
+- **`publish`**: `true` lets the public badge service grade this repository (see [Publish a public grade](#publish-a-public-grade)). Leave it out and nothing is ever published. **`publishDirs`** does the same for projects in subfolders, and only counts in the config at the top of the repository.
 - **`allow`**: some doors are meant to be open, like a public menu. Every entry needs a written reason. Entries that no longer match anything are reported, so an old exception can't quietly cover something new.
 - **`defaults`**: rattlecheck assumes Supabase's stock privileges, where new tables and functions in `public` are open to `anon` and `authenticated` until you revoke them. A baseline that revokes those defaults inside a `DO` block is followed when the statement is certain to run and its text can be worked out (string literals, `format()`, `current_user`). If yours builds the revoke some other way, set `"clean"`, or `{ "functions": "clean", "tables": "supabase-stock" }`.
 - **`exposedSchemas`**: read from `supabase/config.toml` (`[api] schemas`) by default.

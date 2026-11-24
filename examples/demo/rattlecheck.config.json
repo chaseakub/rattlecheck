@@ -1,0 +1,9 @@
+{
+  "allow": [
+    {
+      "rule": "RC005",
+      "object": "public.menu_items",
+      "reason": "The menu is public on the website. Anyone may read it; nobody but the service role can change it."
+    }
+  ]
+}

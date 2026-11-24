@@ -1,0 +1,17 @@
+{
+  "name": "rattlecheck",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  // model.js and config.js import node:fs and node:path for the command line.
+  // The service never calls them, but the imports have to resolve.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "kv_namespaces": [{ "binding": "GRADES", "id": "9e11d1e28a684c2b96b63ec8776a4fb4" }],
+  "ratelimits": [
+    // Per caller address (per /64 for IPv6).
+    { "name": "PUBLISH_LIMITER", "namespace_id": "7301", "simple": { "limit": 10, "period": 60 } },
+    // Per repository, whoever asks and whatever folder is named.
+    { "name": "REPO_LIMITER", "namespace_id": "7302", "simple": { "limit": 4, "period": 60 } }
+  ]
+}

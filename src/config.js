@@ -4,6 +4,8 @@
 //   "defaults": "supabase-stock",          // or "clean", or { "functions": "clean", "tables": "supabase-stock" }
 //   "exposedSchemas": ["public"],          // optional; read from supabase/config.toml otherwise
 //   "migrationRoles": ["postgres"],        // optional; the roles your migrations run as
+//   "publish": true,                       // optional; lets the public badge service grade this repo
+//   "publishDirs": ["apps/api"],           // optional, top of the repo only; the same for projects in subfolders
 //   "allow": [
 //     { "rule": "RC005", "object": "public.menu_items", "reason": "Menu is public on the website." }
 //   ]
@@ -23,14 +25,21 @@ export function loadConfig(root, explicitPath) {
   const p = explicitPath ? path.resolve(explicitPath) : path.join(root, 'rattlecheck.config.json');
   if (!fs.existsSync(p)) {
     if (explicitPath) throw new ConfigError(`Config file not found: ${p}`);
-    return { path: null, defaults: undefined, exposedSchemas: undefined, migrationRoles: undefined, allow: [] };
+    return { path: null, defaults: undefined, exposedSchemas: undefined, migrationRoles: undefined, allow: [], publish: false, publishDirs: [] };
   }
+  return { path: p, ...parseConfig(fs.readFileSync(p, 'utf8'), p) };
+}
+
+/** Validates the text of a rattlecheck.config.json. `label` names the file in error messages. */
+export function parseConfig(text, label = 'rattlecheck.config.json') {
+  const p = label;
   let raw;
   try {
-    raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    raw = JSON.parse(text);
   } catch (e) {
     throw new ConfigError(`${p} is not valid JSON: ${e.message}`);
   }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ConfigError(`${p} must be a JSON object`);
 
   const d = raw.defaults;
   if (d !== undefined) {
@@ -58,5 +67,16 @@ export function loadConfig(root, explicitPath) {
     throw new ConfigError('"migrationRoles" must be a non-empty array of role names (the roles your migrations run as)');
   }
 
-  return { path: p, defaults: d, exposedSchemas: raw.exposedSchemas, migrationRoles: raw.migrationRoles, allow };
+  if (raw.publish !== undefined && typeof raw.publish !== 'boolean') throw new ConfigError('"publish" must be true or false');
+  const dirs = raw.publishDirs ?? [];
+  if (!(Array.isArray(dirs) && dirs.every((x) => typeof x === 'string'))) throw new ConfigError('"publishDirs" must be an array of folder names');
+
+  return {
+    defaults: d,
+    exposedSchemas: raw.exposedSchemas,
+    migrationRoles: raw.migrationRoles,
+    allow,
+    publish: raw.publish === true,
+    publishDirs: dirs.map((x) => x.trim().replace(/^\.?\/+|\/+$/g, '')),
+  };
 }

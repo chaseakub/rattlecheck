@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { scan, ScanError } from './scan.js';
-import { ConfigError } from './config.js';
+import { ConfigError, loadConfig } from './config.js';
+import { publishProject, renderPublished, PublishFailed } from './publish.js';
 import { renderTerminal } from './report/terminal.js';
 import { renderSarif } from './report/sarif.js';
 import { renderBadge } from './report/badge-svg.js';
 import { renderCard } from './report/card-svg.js';
 import { ALL_RULES, getRule } from './rules/index.js';
-import { VERSION } from './version.js';
+import { VERSION, USER_AGENT } from './version.js';
 
 const HELP = `rattlecheck ${VERSION}: rattle every door you own.
 
@@ -26,6 +27,9 @@ Options
   --card [file]       write a 1200x630 share card  (default: rattlecheck-card.svg)
   --fix-sql [file]    write every suggested fix to one file to review (default: rattlecheck-fixes.sql)
   --live              also check your running project, read-only, after proving it's yours
+  --publish           publish a public grade and badge for this project's GitHub repository
+                      (the repository must opt in with "publish": true in rattlecheck.config.json)
+  --repo <owner/name> the GitHub repository to publish, when it is not the "origin" remote
   --config <file>     config file (default: rattlecheck.config.json in the project folder)
   --no-color          plain text output
   -h, --help          show this help
@@ -34,11 +38,12 @@ Options
 Exit codes
   0  nothing open        1  open door found       2  usage or config error
   3  could not parse     4  live check refused (ownership not proven)
+  5  publish refused or failed
 
 rattlecheck never changes your database. Fixes are printed for you to review.`;
 
 function parseArgs(argv) {
-  const opts = { root: null, technical: false, json: false, sarif: false, out: null, badge: null, card: null, fixSql: null, live: false, config: null, color: true };
+  const opts = { root: null, technical: false, json: false, sarif: false, out: null, badge: null, card: null, fixSql: null, live: false, config: null, color: true, publish: false, repo: null };
   const takeOptional = (i, ext, dflt) => {
     const next = argv[i + 1];
     if (next && !next.startsWith('-') && next.toLowerCase().endsWith(ext)) return [next, i + 1];
@@ -51,6 +56,8 @@ function parseArgs(argv) {
       case '--json': opts.json = true; break;
       case '--sarif': opts.sarif = true; break;
       case '--live': opts.live = true; break;
+      case '--publish': opts.publish = true; break;
+      case '--repo': opts.repo = argv[++i]; if (!opts.repo) throw new ScanError('--repo needs owner/name'); break;
       case '--no-color': opts.color = false; break;
       case '--out': opts.out = argv[++i]; if (!opts.out) throw new ScanError('--out needs a file name'); break;
       case '--config': opts.config = argv[++i]; if (!opts.config) throw new ScanError('--config needs a file name'); break;
@@ -64,6 +71,7 @@ function parseArgs(argv) {
     }
   }
   if (opts.json && opts.sarif) throw new ScanError('Pick one of --json or --sarif.');
+  if (opts.repo && !opts.publish) throw new ScanError('--repo only goes with --publish.');
   return opts;
 }
 
@@ -94,7 +102,7 @@ function explain(rule) {
   ].join('\n');
 }
 
-export async function main(argv, { stdout = process.stdout, stderr = process.stderr, env = process.env } = {}) {
+export async function main(argv, { stdout = process.stdout, stderr = process.stderr, env = process.env, fetchImpl = globalThis.fetch, git } = {}) {
   try {
     if (argv.includes('-h') || argv.includes('--help')) {
       stdout.write(`${HELP}\n`);
@@ -146,10 +154,22 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
     for (const w of written) (opts.json || opts.sarif ? stderr : stdout).write(`  wrote ${w}\n`);
     if (written.length && !(opts.json || opts.sarif)) stdout.write('\n');
 
+    if (opts.publish) {
+      // Consent is read from the top of the repository, as the service reads it.
+      const consent = ({ dir, top }) => {
+        const rootConfig = loadConfig(dir ? top : root, dir ? undefined : opts.config);
+        return dir
+          ? { optedIn: rootConfig.publishDirs.includes(dir), hint: `Add "publishDirs": ["${dir}"] to rattlecheck.config.json at the top of the repository.` }
+          : { optedIn: rootConfig.publish, hint: 'Add "publish": true to rattlecheck.config.json.' };
+      };
+      const published = await publishProject({ root, consent, repo: opts.repo, env, fetchImpl, git, userAgent: USER_AGENT });
+      (opts.json || opts.sarif ? stderr : stdout).write(renderPublished(published, report.grade.letter));
+    }
+
     if (!report.coverage.ok) return 3;
     return report.counts.critical + report.counts.high > 0 ? 1 : 0;
   } catch (e) {
-    if (e instanceof ScanError || e instanceof ConfigError) {
+    if (e instanceof ScanError || e instanceof ConfigError || e instanceof PublishFailed) {
       stderr.write(`rattlecheck: ${e.message}\n`);
       return e.code ?? 2;
     }

@@ -2,8 +2,8 @@
 import path from 'node:path';
 import { buildModel, findMigrationsDir, loadMigrations, readExposedSchemas } from './model.js';
 import { loadConfig } from './config.js';
-import { STATIC_RULES, LIVE_RULES } from './rules/index.js';
-import { countBySeverity, gradeFor, GRADES, OPEN_SEVERITIES } from './report/grade.js';
+import { LIVE_RULES } from './rules/index.js';
+import { decorate, runStaticRules, settle, coverageOf } from './core.js';
 import { readProjectEnv, looksSecret } from './live/env.js';
 import { proveOwnership } from './live/ownership.js';
 import { probeTables } from './live/probe.js';
@@ -18,17 +18,6 @@ export class ScanError extends Error {
     super(message);
     this.code = code;
   }
-}
-
-function decorate(rule, f, root, migrationsDir) {
-  return {
-    rule: rule.id,
-    title: rule.title,
-    target: rule.target,
-    ...f,
-    file: f.file && migrationsDir ? path.relative(root, path.join(migrationsDir, f.file)) : f.file,
-    standards: rule.standards,
-  };
 }
 
 /**
@@ -51,13 +40,8 @@ export async function scan({ root = '.', live = false, configPath, env = process
   const exposedSchemas = config.exposedSchemas ?? readExposedSchemas(root);
   const model = buildModel(migrations, { defaults: config.defaults, exposedSchemas, migrationRoles: config.migrationRoles });
 
-  const raw = [];
-  const checked = new Set();
-  for (const rule of STATIC_RULES) {
-    const r = rule.check(model);
-    r.checked.forEach((c) => checked.add(c));
-    for (const f of r.findings) raw.push(decorate(rule, f, root, migrationsDir));
-  }
+  const fileOf = (file) => path.relative(root, path.join(migrationsDir, file));
+  const { raw, checked } = runStaticRules(model, fileOf);
 
   let liveReport = { ran: false };
   if (live) {
@@ -89,7 +73,7 @@ export async function scan({ root = '.', live = false, configPath, env = process
     for (const rule of LIVE_RULES) {
       const r = rule.check(probe, model);
       r.checked.forEach((c) => checked.add(c));
-      for (const f of r.findings) raw.push(decorate(rule, f, root, migrationsDir));
+      for (const f of r.findings) raw.push(decorate(rule, f, fileOf));
     }
     const by = (s) => probe.results.filter((x) => x.state === s).length;
     const known = new Set(fromMigrations);
@@ -115,31 +99,7 @@ export async function scan({ root = '.', live = false, configPath, env = process
     };
   }
 
-  // Allowlist: exact rule + object name.
-  const findings = [];
-  const allowed = [];
-  const used = new Set();
-  for (const f of raw) {
-    const idx = config.allow.findIndex((a) => a.rule.toUpperCase() === f.rule && a.object === f.name);
-    if (idx === -1) findings.push(f);
-    else {
-      used.add(idx);
-      allowed.push({ ...f, reason: config.allow[idx].reason });
-    }
-  }
-  const configWarnings = config.allow
-    .map((a, i) => ({ a, i }))
-    .filter(({ a, i }) => !used.has(i) && !(a.rule.toUpperCase() === 'RC101' && !live))
-    .map(({ a }) => `allow entry ${a.rule} ${a.object} matches nothing. Remove it, so it can't quietly cover something new later.`);
-
-  const order = { critical: 0, high: 1, warning: 2 };
-  findings.sort((a, b) => order[a.severity] - order[b.severity] || a.rule.localeCompare(b.rule) || a.name.localeCompare(b.name));
-
-  const counts = countBySeverity(findings);
-  const letter = checked.size === 0 ? 'N/A' : gradeFor(counts);
-  const open = new Set(findings.filter((f) => OPEN_SEVERITIES.has(f.severity)).map((f) => f.object));
-
-  const coverageOk = !(migrations.length > 0 && model.coverage.statements === 0);
+  const settled = settle({ raw, checked, allow: config.allow, live });
 
   return {
     schema: REPORT_SCHEMA,
@@ -148,20 +108,8 @@ export async function scan({ root = '.', live = false, configPath, env = process
     generatedAt: new Date().toISOString(),
     root,
     migrationsDir: path.relative(root, migrationsDir) || '.',
-    grade: { letter, ...GRADES[letter] },
-    doors: { checked: checked.size, open: open.size },
-    counts,
-    findings,
-    allowed,
-    configWarnings,
-    coverage: {
-      ok: coverageOk,
-      ...model.coverage,
-      tables: model.tables.size,
-      functions: model.functions.size,
-      exposedSchemas,
-      defaults: model.defaults,
-    },
+    ...settled,
+    coverage: coverageOf(model, migrations.length, exposedSchemas),
     live: liveReport,
   };
 }

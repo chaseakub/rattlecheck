@@ -39,12 +39,17 @@ export function findMigrationsDir(root) {
 
 /** Exposed schemas from supabase/config.toml ([api] schemas = [...]), falling back to Supabase's default. */
 export function readExposedSchemas(root) {
-  const fallback = ['public', 'graphql_public'];
   const tomlPath = path.join(root, 'supabase', 'config.toml');
-  if (!fs.existsSync(tomlPath)) return fallback;
+  if (!fs.existsSync(tomlPath)) return ['public', 'graphql_public'];
+  return parseExposedSchemas(fs.readFileSync(tomlPath, 'utf8'));
+}
+
+/** The same, from the text of a supabase/config.toml. */
+export function parseExposedSchemas(toml) {
+  const fallback = ['public', 'graphql_public'];
   let inApi = false;
   let collecting = null;
-  for (const raw of fs.readFileSync(tomlPath, 'utf8').split(/\r?\n/)) {
+  for (const raw of toml.split(/\r?\n/)) {
     const line = raw.replace(/#.*$/, '').trim();
     if (collecting !== null) {
       collecting += ` ${line}`;
@@ -203,6 +208,9 @@ const SEARCH_PATH_RE = /\bSET\s+"?search_path"?\s*(?:=|TO)\s*([^\n]*)|\bSET\s+"?
  * @param {{file:string, sql:string}[]} migrations
  * @param {{defaults?: string|object, exposedSchemas?: string[], migrationRoles?: string[]}} opts
  */
+/** Thrown when migrations exceed opts.maxStatements, so a caller with little memory can stop early. */
+export class BudgetError extends Error {}
+
 export function buildModel(migrations, opts = {}) {
   // `defaults` is a string for both object kinds, or { functions, tables }.
   const d0 = opts.defaults ?? 'supabase-stock';
@@ -334,6 +342,7 @@ export function buildModel(migrations, opts = {}) {
       const head = stripComments(rawStmt).trimStart();
       if (!head) continue;
       coverage.statements++;
+      if (opts.maxStatements && coverage.statements > opts.maxStatements) throw new BudgetError('too many statements');
       const line = lineAt(index);
       const flat = blankLiterals(head); // for keyword tests that must not see string contents
       pathSentinel = unknownPath && !/^CREATE\b/i.test(head) && !reopens(head);
