@@ -11,12 +11,10 @@ At closing time, a good manager walks the building and rattles every door to mak
 Run from your Supabase repo root with Node.js 20 or newer:
 
 ```bash
-npx rattlecheck
+npx rattlecheck@latest
 ```
 
 ```
-  rattlecheck 0.1.1  rattle every door you own
-
   ┌──────────────────────────────────────────────┐
   │ GRADE  F  Wide open                          │
   │ 3 doors checked, 3 open                      │
@@ -69,12 +67,12 @@ rattlecheck has an MCP server built in. Connect it and your agent can check its 
 
 **Claude Code**
 ```bash
-claude mcp add rattlecheck -- npx -y rattlecheck mcp
+claude mcp add rattlecheck -- npx -y rattlecheck@latest mcp
 ```
 
 **Cursor, Windsurf, and other MCP clients** (`.cursor/mcp.json` or your client's equivalent):
 ```json
-{ "mcpServers": { "rattlecheck": { "command": "npx", "args": ["-y", "rattlecheck", "mcp"] } } }
+{ "mcpServers": { "rattlecheck": { "command": "npx", "args": ["-y", "rattlecheck@latest", "mcp"] } } }
 ```
 
 Tools: `scan` (grade, plain-English findings, fix SQL), `explain_rule`, `list_rules`. The server tells the agent to put fixes in a new migration, never to run SQL against production, and never to silence a finding without asking you.
@@ -87,8 +85,8 @@ Prefer instructions over a server? Drop in one of these:
 ## Share your grade
 
 ```bash
-npx rattlecheck --card     # 1200x630 share image: rattlecheck-card.svg
-npx rattlecheck --badge    # README badge: rattlecheck-badge.svg
+npx rattlecheck@latest --card     # 1200x630 share image: rattlecheck-card.svg
+npx rattlecheck@latest --badge    # README badge: rattlecheck-badge.svg
 ```
 
 The card shows the grade and counts only. It never names a table, a function, or your project, so a failing card doesn't tell anyone where the hole is.
@@ -98,11 +96,11 @@ The card shows the grade and counts only. It never names a table, a function, or
 For an open source project, a grade on your own machine is a claim. A grade anyone can check is evidence.
 
 ```bash
-npx rattlecheck --publish
+npx rattlecheck@latest --publish
 ```
 
 1. Add `"publish": true` to the `rattlecheck.config.json` at the top of your repository, commit it, and push it. For a project in a subfolder, add `"publishDirs": ["apps/api"]` there instead. That line is your consent, and it has to be in the repository itself.
-2. Run `npx rattlecheck --publish` from the project folder.
+2. Run `npx rattlecheck@latest --publish` from the project folder.
 3. Paste the badge it prints into your README.
 
 [![rattlecheck](https://rattlecheck.chase-000.workers.dev/badge/chaseakub/rattlecheck.svg?dir=examples%2Fdemo)](https://rattlecheck.chase-000.workers.dev/r/chaseakub/rattlecheck?dir=examples%2Fdemo) is the grade of [`examples/demo`](examples/demo) in this repository.
@@ -120,7 +118,7 @@ Public GitHub repositories with up to 1 MB of migrations. The published grade re
 ## Live check
 
 ```bash
-npx rattlecheck --live
+npx rattlecheck@latest --live
 ```
 
 Static checks read your migration files. The live check asks your running project, with only the public key, how many rows each table will hand over. It catches what migrations can't: a policy someone added in the dashboard, or a table that was changed by hand.
@@ -147,7 +145,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npx -y rattlecheck --sarif --out rattlecheck.sarif
+      - run: npx -y rattlecheck@latest --sarif --out rattlecheck.sarif
       - if: always()
         uses: github/codeql-action/upload-sarif@v3
         with: { sarif_file: rattlecheck.sarif }
@@ -201,7 +199,7 @@ Every finding is labeled with the controls auditors and agencies already use, so
 
 ## What it doesn't check yet
 
-rattlecheck 0.1 reads Supabase migrations and, with `--live`, your running project's tables. It does not yet look at views, storage buckets, edge functions, auth settings, or secrets leaked into your website's code. Inside a `DO` block it replays only what is certain to run: statements at the top level of the block, with text it can work out. Anything conditional, looped, or built from data at run time is skipped and counted in the report, which is one more reason to run `--live`.
+RattleCheck reads Supabase migrations and, with `--live`, your running project's tables. It does not yet look at views, storage buckets, edge functions, auth settings, or secrets leaked into your website's code. Inside a `DO` block it replays only what is certain to run: statements at the top level of the block, with text it can work out. Anything conditional, looped, or built from data at run time is skipped and counted in the report, which is one more reason to run `--live`.
 
 ## License
 
