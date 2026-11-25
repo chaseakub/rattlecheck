@@ -9,7 +9,7 @@ const fixture = file => readFileSync(new URL('../examples/public-directory/' + f
 const wide = fixture('001_directory.sql');
 const narrow = fixture('002_narrow_reads.sql');
 const config = { defaults: 'clean', allow: [{ rule: 'RC005', object: 'public.directory', reason: 'Directory entries are publicly listed.' }] };
-const columns = report => report.findings.filter(f => f.rule === 'RC006').map(f => f.name);
+const columns = report => report.findings.filter(f => f.rule === 'RC006' && f.detail).map(f => f.name);
 
 test('public row exception cannot hide a table-wide grant on private_email', async () => {
   const before = await scanSql(wide, { config });
@@ -62,7 +62,7 @@ test('RC006 follows exposed schemas, SELECT-capable roles and policies', async (
 test('unknown business names can be marked private and a wide grant still gets its own review warning', async () => {
   const sql = wide.replace('private_email', 'draft_budget');
   const any = await scanSql(sql, { config });
-  assert.deepEqual(columns(any), ['public.directory']);
+  assert.deepEqual(any.findings.map(f => f.name), ['public.directory']);
   assert.match(any.findings[0].plain, /whole table/);
   const custom = { ...config, privateColumns: { 'public.directory': ['draft_budget'] } };
   const report = scanStatic({ migrations:[{file:'01.sql', sql}],config:custom });
@@ -102,4 +102,11 @@ test('the annotation points to the migration that exposed the field', async () =
 test('quoted uppercase roles do not grant a policy to the actual anon role', async () => {
   assert.deepEqual(columns(await scanSql(wide.replace('for select to anon', 'for select to "ANON"'), { config })), []);
   assert.deepEqual(columns(await scanSql(wide.replace('for select to anon', 'for select to "anon"'), { config })), ['public.directory.private_email']);
+});
+
+test('allowing one field does not approve table-wide access for future fields', async () => {
+  const allow = [...config.allow, { rule: 'RC006', object: 'public.directory.email', reason: 'Public business contact email.' }];
+  const sql = wide.replace('private_email', 'email');
+  const result = await scanSql(sql, { config: { ...config, allow } });
+  assert.deepEqual(result.findings.map(f => [f.rule, f.name]), [['RC006', 'public.directory']]);
 });

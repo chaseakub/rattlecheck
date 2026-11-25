@@ -41,7 +41,6 @@ export default {
       const ref = qualified(table.schema, table.name);
       const names = scope.all ? new Set([...table.columns, ...scope.columns]) : scope.columns;
       const designated = new Set(config.privateColumns?.[table.key] ?? []);
-      const initialCount = findings.length;
       for (const name of [...names].sort()) {
         const severity = columnSeverity(name, designated);
         if (!severity) continue;
@@ -58,10 +57,9 @@ export default {
         });
       }
 
-      // No column name can establish a team's intent. Still surface an unrestricted
-      // grant independently of RC005 when a policy explicitly allows public rows.
+      // A field-specific exception cannot approve the entire table or its future columns.
       const publicRows = policies.some(p => p.permissive && (p.using == null || alwaysTrue(p.using)));
-      if (scope.all && publicRows && findings.length === initialCount) {
+      if (scope.all && publicRows) {
         findings.push({
           object: `table:${table.key}`, name: table.key, ...readColumnLocation(table, null), severity: 'warning',
           message: `Anonymous table-wide SELECT on ${ref} covers every current and future column on visible rows.`,
