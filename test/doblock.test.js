@@ -378,7 +378,7 @@ test('T3: with search_path unknown, statements that open something still land', 
   const rls = await scanSql(`${T}\nALTER TABLE public.t ENABLE ROW LEVEL SECURITY;\n${lost}\nALTER TABLE t DISABLE ROW LEVEL SECURITY;`);
   assert.deepEqual(ids(rls), ['RC001 public.t']);
   const policy = await scanSql(`${T}\nALTER TABLE public.t ENABLE ROW LEVEL SECURITY;\n${lost}\nCREATE POLICY p ON t FOR ALL TO anon USING (true) WITH CHECK (true);`);
-  assert.deepEqual(ids(policy), ['RC005 public.t']);
+  assert.deepEqual(ids(policy), ['RC005 public.t', 'RC006 public.t']);
   // SET LOCAL does not put the session path back.
   const local = await scanSql(`create schema private; ${T} create table private.t (id int);\n${lost}\nBEGIN; SET LOCAL search_path TO public; COMMIT;\nALTER TABLE t ENABLE ROW LEVEL SECURITY;`);
   assert.deepEqual(ids(local), ['RC001 public.t']);

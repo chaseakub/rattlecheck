@@ -199,10 +199,10 @@ async function check(target, { store, fetchImpl, version, now = () => new Date()
   const exposedSchemas = toml === undefined ? ['public', 'graphql_public'] : parseExposedSchemas(toml);
   let result;
   try {
-    // Only the allow list is taken from the project's config. The settings
+    // Only the allow list and private-column declarations are taken from the project's config. The settings
     // that change what counts as reachable (defaults, exposedSchemas,
     // migrationRoles) are not: a public grade uses the stock ones for everyone.
-    result = scanStatic({ migrations, config: { allow: config.allow }, exposedSchemas, maxStatements: LIMITS.statements, fileOf: (f) => `${folder}/${f}` });
+    result = scanStatic({ migrations, config: { allow: config.allow, privateColumns: config.privateColumns }, exposedSchemas, maxStatements: LIMITS.statements, fileOf: (f) => `${folder}/${f}` });
   } catch (e) {
     if (e instanceof BudgetError) throw await refuse(413, 'too_large', 'The migrations have too many statements for the public service to check. Run npx rattlecheck on your own machine.');
     throw await refuse(422, 'scan_failed', 'The migrations could not be checked. Run npx rattlecheck locally to see why.');

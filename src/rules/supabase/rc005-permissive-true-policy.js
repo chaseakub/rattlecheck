@@ -1,8 +1,8 @@
-import { tableExposure } from '../../model.js';
+import { tableExposure, tableSelectScope } from '../../model.js';
 import { qualified, quoteIdent } from '../../sql/ident.js';
 
 // `true`, `(true)`, `1 = 1` and friends: an expression that admits every row.
-function alwaysTrue(expr) {
+export function alwaysTrue(expr) {
   if (expr == null) return false;
   const e = expr.toLowerCase().replace(/[\s()]/g, '');
   return e === 'true' || e === '1=1' || e === "'t'" || e === 'true::boolean';
@@ -43,7 +43,13 @@ export default {
         //     only touch their own rows, but can save them as someone else's. Warning.
         //   read (SELECT): often deliberate (a menu, store hours). Warning, anon only.
         const kind = p.cmd === 'SELECT' ? 'read' : p.cmd === 'INSERT' ? 'add' : usingTrue ? 'change' : 'claim';
-        if (kind === 'read' && !forAnon) continue;
+        let readScope;
+        if (kind === 'read') {
+          if (!forAnon) continue;
+          const scope = tableSelectScope(t, 'anon');
+          if (!scope.all && !scope.columns.size) continue;
+          readScope = scope.all ? 'every column, including future columns' : [...scope.columns].sort().map(quoteIdent).join(', ');
+        }
 
         const who = forAnon ? 'Anyone on the internet' : 'Anyone who signs up for your app';
         const action = { ALL: 'read, add, change and delete', UPDATE: 'change', DELETE: 'delete' }[p.cmd];
@@ -54,13 +60,13 @@ export default {
           change: `${who} can ${action} any row in the "${t.name}" table, including other people's. The rule "${p.name}" allows it for every row.`,
           add: `${who} can add rows to the "${t.name}" table. That's fine for a signup or contact form. Make sure nobody can add a row that pretends to belong to someone else.`,
           claim: `${who} can save rows in the "${t.name}" table that claim to belong to someone else. The rule "${p.name}" checks which rows they start from, but not what they save.`,
-          read: `${who} can read every row in the "${t.name}" table. That's fine for truly public data, like a menu. It is not fine for anything personal.`,
+          read: `The "${p.name}" policy permits signed-out reads on every row in "${t.name}". The SELECT grant covers ${readScope}.`,
         }[kind];
         const todo = {
           change: 'Replace this rule with one that only lets people touch their own rows.',
           add: 'If this is a public form, mark it as allowed in rattlecheck.config.json with a reason. If rows belong to users, check that the new row is theirs.',
           claim: 'Add a WITH CHECK that matches the USING, so a saved row still belongs to the person saving it.',
-          read: 'Confirm this table holds nothing private. If it\'s meant to be public, mark it as allowed in rattlecheck.config.json with a reason.',
+          read: 'Confirm the readable columns are intended for public use. If the public row policy is intentional, allow RC005 with a reason.',
         }[kind];
         findings.push({
           object: `table:${t.key}`,

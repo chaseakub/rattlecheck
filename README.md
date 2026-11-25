@@ -4,6 +4,12 @@
 
 [**Would you ship this migration?**](https://chaseakub.github.io/rattlecheck/) Review nine lines of SQL, make the call, and see what happens when a customer hits Save. Try it in your browser.
 
+[Compare the public and private columns in your browser](https://chaseakub.github.io/rattlecheck/column-permissions/), or try the [0.3.0 column permission check](docs/rules/RC006.md) from your Supabase project directory:
+
+```sh
+npx github:chaseakub/rattlecheck#v0.3.0
+```
+
 At closing time, a good manager walks the building and rattles every door to make sure it's locked. rattlecheck does that for your app. It checks every table, function, and rule in your Supabase project the way someone on the outside would, tells you in plain English which doors are open, and gives you the exact fix.
 
 ```bash
@@ -52,6 +58,7 @@ Every rule in rattlecheck comes from a real incident in a production app:
 | [RC003](docs/rules/RC003.md) | A `SECURITY DEFINER` function without a pinned `search_path` | high |
 | [RC004](docs/rules/RC004.md) | A trigger that runs with the user's rights and writes to a server-only table, so user saves fail | high |
 | [RC005](docs/rules/RC005.md) | A policy whose condition is just `true`, letting anyone change every row | high |
+| [RC006](docs/rules/RC006.md) | Anonymous SELECT on public rows includes a private field or covers all current and future columns | high or warning |
 | [RC101](docs/rules/RC101.md) | **Live:** a table on your running project that hands rows to the public key | critical |
 
 rattlecheck doesn't grep your files. It replays every migration in order, statement by statement, the way Postgres would, so it knows the current state: a revoke from March doesn't count if the function was dropped and re-created in June, and a policy that was later dropped protects nothing.
@@ -106,7 +113,7 @@ How it stays honest:
 
 - **The service does the check, not your machine.** `--publish` sends the repository name and the project folder, nothing else. The service fetches the latest commit on the default branch and runs the same check there, so a grade can't be talked up from a laptop.
 - **Opt-in lives at the top of the repository.** A project whose committed config does not opt in is never graded or listed, whoever asks. Remove the line and the next check takes the page down. A config inside a copied or vendored folder can't opt that folder in.
-- **Same settings for everyone.** A public grade takes only the `allow` list from your config. `defaults`, `exposedSchemas` and `migrationRoles` are ignored, so a project can't adjust its way to a better letter. If you rely on one of those locally, the public grade may be lower than the one on your machine.
+- **Same settings for everyone.** A public grade reads the `allow` list and `privateColumns` declarations from your config. `defaults`, `exposedSchemas` and `migrationRoles` are ignored, so a project can't adjust its way to a better letter. If you rely on one of those locally, the public grade may be lower than the one on your machine.
 - **The page never says which door is open.** It shows the grade, how many doors were checked, how many are open, and how many the project marked as open on purpose. No table names, no function names.
 - **Exceptions are counted in public.** An A with 40 doors "open on purpose" says so on the page.
 
@@ -169,6 +176,7 @@ Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3
 - **`allow`**: some doors are meant to be open, like a public menu. Every entry needs a written reason. Entries that no longer match anything are reported, so an old exception can't quietly cover something new.
 - **`defaults`**: rattlecheck assumes Supabase's stock privileges, where new tables and functions in `public` are open to `anon` and `authenticated` until you revoke them. A baseline that revokes those defaults inside a `DO` block is followed when the statement is certain to run and its text can be worked out (string literals, `format()`, `current_user`). If yours builds the revoke some other way, set `"clean"`, or `{ "functions": "clean", "tables": "supabase-stock" }`.
 - **`exposedSchemas`**: read from `supabase/config.toml` (`[api] schemas`) by default.
+- **`privateColumns`** lists fields that signed-out visitors should never read. For example, `"privateColumns": {"public.directory": ["draft_budget"]}` makes anonymous access to that field a high finding.
 - **`migrationRoles`**: the roles your migrations run as (default `["postgres"]`). `ALTER DEFAULT PRIVILEGES FOR ROLE` only counts when it names one of them.
 
 ## Standards
@@ -182,6 +190,7 @@ Every finding is labeled with the controls auditors and agencies already use, so
 | RC003 | CWE-426 | CM-6, AC-6 | 4.1 |
 | RC004 | CWE-279 | AC-6, AU-9 | 8.2 |
 | RC005 | CWE-732 | AC-3, AC-6 | 3.3 |
+| RC006 | CWE-200 | AC-3, AC-6 | 3.3 |
 | RC101 | CWE-200, CWE-284 | AC-3, AC-6 | 3.3 |
 
 ## Built to be trusted

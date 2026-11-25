@@ -41,7 +41,7 @@ export async function scan({ root = '.', live = false, configPath, env = process
   const model = buildModel(migrations, { defaults: config.defaults, exposedSchemas, migrationRoles: config.migrationRoles });
 
   const fileOf = (file) => path.relative(root, path.join(migrationsDir, file));
-  const { raw, checked } = runStaticRules(model, fileOf);
+  const { raw, checked } = runStaticRules(model, fileOf, config);
 
   let liveReport = { ran: false };
   if (live) {

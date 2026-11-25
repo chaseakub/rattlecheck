@@ -14,7 +14,7 @@ The public grade and badge behind `rattlecheck --publish`. A Cloudflare Worker w
 1. The service does the check itself. Nothing a caller sends can change a grade.
 2. A repository is only graded when the committed config at its top opts in. Removing the opt-in deletes the published grade at the next check, and so does anything else that leaves the check without a grade (the repository went private, lost its migrations, grew past the limits).
 3. The stored record holds the grade and counts. Never which table or function is open.
-4. Only the `allow` list is read from the project's config. `defaults`, `exposedSchemas` and `migrationRoles` are ignored, so every project is graded with the same stock settings.
+4. The service reads the `allow` list and `privateColumns` declarations from the project config. `defaults`, `exposedSchemas` and `migrationRoles` are ignored, so every project is graded with the same stock settings.
 5. A repository that uses `export-ignore` or `export-subst` in a `.gitattributes` on the path to its migrations is refused: GitHub leaves such files out of the archive the service reads.
 
 ## Limits

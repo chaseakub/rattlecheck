@@ -222,7 +222,7 @@ test('RC005: SELECT using (true) for anon is only a warning', async () => {
     create table public.menu_items (id int, name text);
     alter table public.menu_items enable row level security;
     create policy "public menu" on public.menu_items for select to anon using (true);`);
-  assert.deepEqual(ids(r), ['RC005 public.menu_items']);
+  assert.deepEqual(ids(r), ['RC005 public.menu_items', 'RC006 public.menu_items']);
   assert.equal(r.findings[0].severity, 'warning');
   assert.equal(r.grade.letter, 'B');
 });
@@ -250,6 +250,7 @@ test('RC005: restrictive policies are not flagged', async () => {
 
 test('allow entry with a reason moves the finding to allowed', async () => {
   const sql = `create table public.menu_items (id int); alter table public.menu_items enable row level security;
+    revoke select on public.menu_items from anon; grant select (id) on public.menu_items to anon;
     create policy "public menu" on public.menu_items for select to anon using (true);`;
   const r = await scanSql(sql, { config: { allow: [{ rule: 'RC005', object: 'public.menu_items', reason: 'The menu is published on the website.' }] } });
   assert.deepEqual(ids(r), []);

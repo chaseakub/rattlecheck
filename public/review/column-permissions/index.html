@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f9f7">
+  <title>Who can read the private email? | RattleCheck</title>
+  <meta name="description" content="Compare two Supabase migrations. The directory stays public while a column grant decides who can read the private email.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Who can read the private email?">
+  <meta property="og:description" content="A public directory, a private email, and the SQL grant that decides who can read it.">
+  <meta property="og:url" content="https://chaseakub.github.io/rattlecheck/column-permissions/">
+  <link rel="stylesheet" href="../review.css">
+  <link rel="stylesheet" href="./columns.css">
+</head>
+<body>
+  <a href="#main" class="skip">Skip to the comparison</a>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <a href="../" class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>RattleCheck</a>
+      <a href="https://github.com/chaseakub/rattlecheck" class="repo-link">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main class="wrap" id="main">
+    <header class="intro column-intro">
+      <p class="kicker"><span class="signal"></span> Supabase column permissions</p>
+      <h1>Who can read the<br>private email<span>?</span></h1>
+      <p class="lead">Anyone can browse this directory. Each listing has a public name and a private email. Here’s what changes when the migration grants access to specific columns.</p>
+    </header>
+    <!-- Insert the two scanner reports and column access matrix at build time. -->
+    <footer class="evidence">
+      <a href="https://github.com/chaseakub/rattlecheck/tree/main/examples/public-directory">View the SQL fixture</a>
+      <a href="https://github.com/chaseakub/rattlecheck/actions/workflows/column-grants.yml?query=branch%3Amain">View the PostgreSQL test runs</a>
+    </footer>
+  </main>
+</body>
+</html>

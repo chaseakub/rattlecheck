@@ -1,0 +1,57 @@
+name: Verify column grants
+
+on:
+  pull_request:
+    paths: &test_paths
+      - '.github/workflows/column-grants.yml'
+      - 'bin/**'
+      - 'examples/public-directory/**'
+      - 'package.json'
+      - 'src/**'
+      - 'service/src/**'
+      - 'test/**'
+  push:
+    branches: [main]
+    paths: *test_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Run the RattleCheck test suite
+        run: npm test
+      - name: Show the CLI finding before and after narrowing the grant
+        shell: bash
+        run: |
+          project="$RUNNER_TEMP/public-directory"
+          mkdir -p "$project/supabase/migrations"
+          cp examples/public-directory/001_directory.sql "$project/supabase/migrations/"
+          status=0
+          node bin/rattlecheck.js "$project" --technical --no-color || status=$?
+          test "$status" -eq 1
+          cp examples/public-directory/002_narrow_reads.sql "$project/supabase/migrations/"
+          node bin/rattlecheck.js "$project" --technical --no-color
+      - name: Verify the public and private directory reads on PostgreSQL
+        env:
+          PGPASSWORD: postgres
+        run: psql -X -h localhost -U postgres -d postgres -f examples/public-directory/verify.psql
