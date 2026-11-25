@@ -10,6 +10,11 @@
   <meta property="og:title" content="Who can read the private email?">
   <meta property="og:description" content="A public directory, a private email, and the SQL grant that decides who can read it.">
   <meta property="og:url" content="https://chaseakub.github.io/rattlecheck/column-permissions/">
+  <meta property="og:image" content="https://chaseakub.github.io/rattlecheck/column-permissions/preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="RattleCheck shows private_email changing from readable to blocked while display_name stays public.">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="../review.css">
   <link rel="stylesheet" href="./columns.css">
 </head>
@@ -28,7 +33,15 @@
       <p class="lead">Anyone can browse this directory. Each listing has a public name and a private email. Here’s what changes when the migration grants access to specific columns.</p>
     </header>
     <!-- Insert the two scanner reports and column access matrix at build time. -->
+    <section class="try" aria-labelledby="try-heading">
+      <div>
+        <h2 id="try-heading">Check your own migrations</h2>
+        <p>Run from your Supabase repo root with Node.js 20 or newer. The scan reads local SQL files and needs no database credentials.</p>
+      </div>
+      <pre class="install-command"><code>npx rattlecheck@latest</code></pre>
+    </section>
     <footer class="evidence">
+      <a href="https://www.npmjs.com/package/rattlecheck">View the npm package</a>
       <a href="https://github.com/chaseakub/rattlecheck/tree/main/examples/public-directory">View the SQL fixture</a>
       <a href="https://github.com/chaseakub/rattlecheck/actions/workflows/column-grants.yml?query=branch%3Amain">View the PostgreSQL test runs</a>
     </footer>

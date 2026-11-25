@@ -95,7 +95,7 @@ async function loadExample() {
     byId('finding').textContent = fixture.before.rule + ' · ' + summary(fixture.before);
     byId('fix-result').textContent = summary(fixture.after);
     byId('source').href = fixture.sourceUrl;
-    const command = 'npx github:chaseakub/rattlecheck#v' + fixture.version;
+    const command = 'npx rattlecheck@latest';
     byId('command').textContent = command;
     byId('install').setAttribute('aria-label', 'Copy command: ' + command);
     byId('install').disabled = false;

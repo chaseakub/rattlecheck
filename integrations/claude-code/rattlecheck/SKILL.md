@@ -17,7 +17,7 @@ rattlecheck replays `supabase/migrations` and grades the project A to F. It neve
 
 1. From the project root, run:
    ```bash
-   npx rattlecheck --json
+   npx rattlecheck@latest --json
    ```
    Or call the `scan` tool if the rattlecheck MCP server is connected.
 2. For each finding, read `plain` (what's wrong, in plain words), `todo`, and `fix` (SQL).
@@ -35,7 +35,7 @@ rattlecheck replays `supabase/migrations` and grades the project A to F. It neve
 
 ## Live check
 
-`npx rattlecheck --live` also asks the running project, read-only, how many rows each table hands to the public key. It only runs after proving the user owns the project (a `SUPABASE_ACCESS_TOKEN` or the service key in the local `.env`). Ask the user before running it.
+`npx rattlecheck@latest --live` also asks the running project, read-only, how many rows each table hands to the public key. It only runs after proving the user owns the project (a `SUPABASE_ACCESS_TOKEN` or the service key in the local `.env`). Ask the user before running it.
 
 ## Exit codes
 
