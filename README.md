@@ -4,13 +4,11 @@
 
 [**Would you ship this migration?**](https://chaseakub.github.io/rattlecheck/) Review nine lines of SQL, make the call, and see what happens when a customer hits Save. Try it in your browser.
 
-[Compare the public and private columns in your browser](https://chaseakub.github.io/rattlecheck/column-permissions/), or try the [0.3.0 column permission check](docs/rules/RC006.md) from your Supabase project directory:
-
-```sh
-npx github:chaseakub/rattlecheck#v0.3.0
-```
+Can signed-out visitors read the names in your public directory **and** the email addresses you meant to keep private? [See the two grants side by side](https://chaseakub.github.io/rattlecheck/column-permissions/). [RC006](docs/rules/RC006.md) checks for this in your local Supabase migrations.
 
 At closing time, a good manager walks the building and rattles every door to make sure it's locked. rattlecheck does that for your app. It checks every table, function, and rule in your Supabase project the way someone on the outside would, tells you in plain English which doors are open, and gives you the exact fix.
+
+Run from your Supabase repo root with Node.js 20 or newer:
 
 ```bash
 npx rattlecheck
