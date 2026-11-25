@@ -52,6 +52,13 @@ export function parseConfig(text, label = 'rattlecheck.config.json') {
     throw new ConfigError('"exposedSchemas" must be an array of schema names');
   }
 
+  const privateColumns = raw.privateColumns;
+  if (privateColumns !== undefined && (
+    !privateColumns || typeof privateColumns !== 'object' || Array.isArray(privateColumns) ||
+    !Object.entries(privateColumns).every(([table, names]) => /^[^.]+\..+$/.test(table) &&
+      Array.isArray(names) && names.every(name => typeof name === 'string' && name.trim()))
+  )) throw new ConfigError('"privateColumns" must map schema-qualified tables to arrays of column names');
+
   const allow = raw.allow ?? [];
   if (!Array.isArray(allow)) throw new ConfigError('"allow" must be an array');
   allow.forEach((a, i) => {
@@ -73,6 +80,7 @@ export function parseConfig(text, label = 'rattlecheck.config.json') {
 
   return {
     defaults: d,
+    privateColumns,
     exposedSchemas: raw.exposedSchemas,
     migrationRoles: raw.migrationRoles,
     allow,

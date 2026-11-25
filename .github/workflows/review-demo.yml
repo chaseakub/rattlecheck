@@ -3,6 +3,7 @@ on:
   pull_request:
     paths: &demo_paths
       - 'examples/order-audit/**'
+      - 'examples/public-directory/**'
       - 'public/review/**'
       - 'scripts/build-review-demo.mjs'
       - 'package.json'

@@ -332,3 +332,15 @@ test('a repository called something.svg still has a page', async () => {
   assert.match(await (await w.get('/badge/acme/logo.svg.svg')).text(), /rattlecheck: A/);
   assert.equal(body.badge, 'https://grade.test/badge/acme/logo.svg.svg');
 });
+
+test('the public grade respects private-column declarations without publishing the field name', async () => {
+  const config = JSON.stringify({ publish: true, privateColumns: { 'public.directory': ['draft_budget'] } });
+  const schema = 'create table public.directory (id int, draft_budget int); alter table public.directory enable row level security; create policy browse on public.directory for select to anon using (true);';
+  const w = world({ 'acme/shop': tarball({ 'rattlecheck.config.json': config, 'supabase/migrations/1.sql': schema }) });
+  const res = await w.post({ repo: 'acme/shop' });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.counts.high, 1);
+  assert.equal(body.grade.letter, 'C');
+  assert.ok(!JSON.stringify(body).includes('draft_budget'));
+});

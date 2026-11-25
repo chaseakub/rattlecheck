@@ -1,0 +1,27 @@
+.mast .brand { text-decoration: none; }
+.column-intro { padding: clamp(2.5rem, 5vw, 4.5rem) 0 2rem; }
+.column-intro .lead { max-width: 60ch; }
+.access { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: left; margin: 0 0 2.3rem; }
+.access caption { text-align: left; font-weight: 650; font-size: 1.12rem; margin-bottom: .8rem; }
+.access th, .access td { border-bottom: 1px solid var(--line); padding: .75rem .8rem; overflow-wrap: anywhere; }
+.access thead th { color: #fff; background: #242623; font-size: .86rem; }
+.access tbody th { background: #fff; font: 500 .87rem/1.5 var(--mono); }
+.access td { background: #fff; font-size: .95rem; }
+.access .private th, .access .private td { font-weight: 650; }
+.access .risk { color: var(--red); }
+.reports { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.report { padding: 1.2rem; border: 1px solid var(--line); border-top: 3px solid var(--ink); border-radius: .25rem; background: #fff; }
+.report:first-child { border-top-color: var(--red); }
+.report-head { display: flex; align-items: baseline; flex-wrap: wrap; justify-content: space-between; gap: .4rem; }
+.report h2 { margin: 0; font-size: 1.28rem; letter-spacing: -.03em; }
+.report .grade { font: 600 .84rem/1.5 var(--mono); }
+.report .finding { line-height: 1.6; margin: 1rem 0; }
+.report details { margin-bottom: .25rem; }
+.report .sql code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.policy-note { margin: 1rem 0 1.8rem; color: var(--muted); font-size: .94rem; line-height: 1.6; }
+.evidence { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 1rem 1.6rem; padding: 1.2rem 0 2.5rem; font-size: .94rem; font-weight: 550; }
+@media (max-width: 680px) {
+  .reports { grid-template-columns: minmax(0,1fr); }
+  .access th, .access td { padding-inline: .45rem; }
+  .access { margin-bottom: 1.3rem; }
+}

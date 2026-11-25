@@ -1,0 +1,49 @@
+-- Run with psql on an empty, disposable PostgreSQL database.
+\set ON_ERROR_STOP on
+begin;
+create role anon;
+\ir 001_directory.sql
+insert into public.directory (id, display_name, private_email)
+values (1, 'Example Studio', 'billing@example.invalid');
+
+set local role anon;
+do $$
+begin
+  if (select private_email from public.directory where id = 1)
+     is distinct from 'billing@example.invalid' then
+    raise exception 'The original grant should allow anon to read the fictional private address';
+  end if;
+end;
+$$;
+\echo Before the fix, anon can read private_email from the public directory row.
+reset role;
+
+\ir 002_narrow_reads.sql
+set local role anon;
+do $$
+begin
+  if (select display_name from public.directory where id = 1)
+     is distinct from 'Example Studio' then
+    raise exception 'Anon should still be able to read id and display_name';
+  end if;
+  begin
+    perform private_email from public.directory where id = 1;
+    raise exception 'Expected PostgreSQL to deny anon access to private_email';
+  exception when insufficient_privilege then
+    null;
+  end;
+end;
+$$;
+\echo After the fix, anon can read id and display_name. PostgreSQL rejects SELECT of private_email.
+reset role;
+
+-- A table-level REVOKE also removes the explicit column grants in the fix.
+revoke select on public.directory from anon;
+do $$
+begin
+  if has_any_column_privilege('anon', 'public.directory', 'SELECT') then
+    raise exception 'Revoking SELECT on the table should clear the column grants to anon';
+  end if;
+end;
+$$;
+rollback;

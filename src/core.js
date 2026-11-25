@@ -19,11 +19,11 @@ export function decorate(rule, f, fileOf) {
 }
 
 /** Runs every static rule over a model. Returns the raw findings and the set of objects checked. */
-export function runStaticRules(model, fileOf) {
+export function runStaticRules(model, fileOf, config = {}) {
   const raw = [];
   const checked = new Set();
   for (const rule of STATIC_RULES) {
-    const r = rule.check(model);
+    const r = rule.check(model, config);
     r.checked.forEach((c) => checked.add(c));
     for (const f of r.findings) raw.push(decorate(rule, f, fileOf));
   }
@@ -87,6 +87,6 @@ export function coverageOf(model, migrationCount, exposedSchemas) {
 export function scanStatic({ migrations, config = {}, exposedSchemas, maxStatements, fileOf = (f) => `supabase/migrations/${f}` }) {
   const schemas = config.exposedSchemas ?? exposedSchemas ?? ['public', 'graphql_public'];
   const model = buildModel(migrations, { defaults: config.defaults, exposedSchemas: schemas, migrationRoles: config.migrationRoles, maxStatements });
-  const { raw, checked } = runStaticRules(model, fileOf);
+  const { raw, checked } = runStaticRules(model, fileOf, config);
   return { model, raw, checked, ...settle({ raw, checked, allow: config.allow ?? [] }), coverage: coverageOf(model, migrations.length, schemas) };
 }

@@ -42,7 +42,7 @@ test('SARIF has every rule, a result per finding, and locations', async () => {
   const s = renderSarif(r);
   assert.equal(s.version, '2.1.0');
   const run = s.runs[0];
-  assert.equal(run.tool.driver.rules.length, 6);
+  assert.deepEqual(run.tool.driver.rules.map(r => r.id), ['RC001', 'RC002', 'RC003', 'RC004', 'RC005', 'RC006', 'RC101']);
   assert.equal(run.results.length, r.findings.length);
   for (const res of run.results) {
     assert.ok(run.tool.driver.rules.some((x) => x.id === res.ruleId));

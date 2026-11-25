@@ -23,8 +23,11 @@ import { splitStatements, stripComments, readQualifiedName, readParenGroup, line
 import { normaliseArgs, signatureKey } from './sql/signature.js';
 import { replayableFromDo, reopens } from './sql/doblock.js';
 
-const PRIVS = ['select', 'insert', 'update', 'delete'];
-const API_ROLES = ['anon', 'authenticated'];
+import {
+  apiRoles, grantees, newTableDefaults, parsePrivileges, createTableAcl,
+  changeTableAcl, effectivePrivileges, declaredColumns, alterColumns,
+} from './sql/column-grants.js';
+export { tableSelectScope, readColumnLocation } from './sql/column-grants.js';
 
 /** Find the migrations directory for a project root (or accept a directory of .sql files). */
 export function findMigrationsDir(root) {
@@ -81,68 +84,24 @@ export function loadMigrations(dir) {
     .map((file) => ({ file, sql: fs.readFileSync(path.join(dir, file), 'utf8') }));
 }
 
-// Split on top-level commas (not inside parentheses or quotes).
-function splitTopLevel(text) {
-  const parts = [];
-  let depth = 0;
-  let cur = '';
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === "'" || ch === '"') {
-      const end = quotedEnd(text, i);
-      cur += text.slice(i, end);
-      i = end - 1;
-      continue;
-    }
-    if (ch === '(') depth++;
-    else if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) {
-      parts.push(cur);
-      cur = '';
-      continue;
-    }
-    cur += ch;
-  }
-  if (cur.trim()) parts.push(cur);
-  return parts.map((p) => p.trim()).filter(Boolean);
-}
-
-// GRANT/REVOKE privilege list -> { table, column, usage }. A column list
-// (`SELECT (email)`) grants access to those columns only; revoking it does NOT
-// remove a table-level grant, so the two must be kept apart.
-function parsePrivs(text) {
-  const table = new Set();
-  const column = new Set();
-  let usage = false;
-  for (const item of splitTopLevel(text.toLowerCase())) {
-    const hasCols = item.includes('(');
-    const word = item.replace(/\(.*$/s, '').trim();
-    if (/^all(\s+privileges)?$/.test(word)) {
-      for (const p of PRIVS) (hasCols ? column : table).add(p);
-      usage = true;
-      continue;
-    }
-    if (word === 'usage') usage = true;
-    if (PRIVS.includes(word)) (hasCols ? column : table).add(word);
-  }
-  return { table, column, usage };
-}
-
 function rolesIn(text) {
-  return {
-    public: /\bpublic\b/i.test(text),
-    anon: /\banon\b/i.test(text),
-    authenticated: /\bauthenticated\b/i.test(text),
-  };
+  const roles = { public: false, anon: false, authenticated: false };
+  let pos = 0;
+  while (pos < text.length) {
+    const group = /^\s*GROUP\s+/i.exec(text.slice(pos));
+    const role = readQualifiedName(text, pos + (group?.[0].length ?? 0));
+    if (!role) break;
+    if (Object.hasOwn(roles, role.name)) roles[role.name] = true;
+    if (text[role.end] !== ',') break;
+    pos = role.end + 1;
+  }
+  return roles;
 }
 
 // Policy roles: absent TO clause means PUBLIC (every role, including anon).
 function parsePolicyRoles(toText) {
   if (!toText) return ['public'];
-  return toText
-    .split(',')
-    .map((r) => r.trim().replace(/"/g, '').toLowerCase())
-    .filter(Boolean);
+  return readNameList(toText, 0).map(role => role.name);
 }
 
 // Reads `a, b, "c"` starting at pos. Returns [{schema, name, end}].
@@ -238,17 +197,17 @@ export function buildModel(migrations, opts = {}) {
   // PUBLIC unless that is revoked globally.
   let globalPublicExecRevoked = defaults.functions === 'clean';
   const globalFn = { anon: false, authenticated: false };
-  const globalTable = { anon: new Set(), authenticated: new Set() };
+  const globalTable = newTableDefaults();
   const fnDefaults = new Map(); // schema -> {publicGrant, anon, authenticated}
-  const tableDefaults = new Map(); // schema -> {anon:Set, authenticated:Set}
+  const tableDefaults = new Map(); // schema -> direct grants per grantee
   if (defaults.functions === 'supabase-stock') fnDefaults.set('public', { publicGrant: false, anon: true, authenticated: true });
-  if (defaults.tables === 'supabase-stock') tableDefaults.set('public', { anon: new Set(PRIVS), authenticated: new Set(PRIVS) });
+  if (defaults.tables === 'supabase-stock') tableDefaults.set('public', newTableDefaults(true));
   const fnDefaultsFor = (s) => {
     if (!fnDefaults.has(s)) fnDefaults.set(s, { publicGrant: false, anon: false, authenticated: false });
     return fnDefaults.get(s);
   };
   const tableDefaultsFor = (s) => {
-    if (!tableDefaults.has(s)) tableDefaults.set(s, { anon: new Set(), authenticated: new Set() });
+    if (!tableDefaults.has(s)) tableDefaults.set(s, newTableDefaults());
     return tableDefaults.get(s);
   };
   const fnKeysForName = (schema, name) => {
@@ -277,7 +236,7 @@ export function buildModel(migrations, opts = {}) {
   const schemaOf = (n) => (n.schema ?? (pathSentinel ? '\u0000unknown' : (localSchema ?? sessionSchema))).toLowerCase();
   const tkey = (n) => `${schemaOf(n)}.${n.name}`;
 
-  function addTable(n, file, line, kind) {
+  function addTable(n, file, line, kind, columns = new Set()) {
     const schema = schemaOf(n);
     const td = tableDefaultsFor(schema);
     const k = `${schema}.${n.name}`;
@@ -289,10 +248,9 @@ export function buildModel(migrations, opts = {}) {
       line,
       kind,
       rls: false,
-      privs: {
-        anon: new Set([...td.anon, ...globalTable.anon]),
-        authenticated: new Set([...td.authenticated, ...globalTable.authenticated]),
-      },
+      columns,
+      columnLocations: new Map(),
+      acl: createTableAcl(td, globalTable),
       policies: new Map(),
     });
     coverage.tablesSeen++;
@@ -417,7 +375,7 @@ export function buildModel(migrations, opts = {}) {
         if (ct[3] && tables.has(tkey(n))) continue;
         // `AS` right after the name (or after a bare column-name list) is CREATE TABLE AS.
         const isCtas = /^\s*(?:\([^()]*\)\s*)?(?:WITH\s*\([^()]*\)\s*)?(?:TABLESPACE\s+\S+\s*)?AS\b/i.test(head.slice(n.end));
-        addTable(n, file, line, isCtas ? 'ctas' : 'table');
+        addTable(n, file, line, isCtas ? 'ctas' : 'table', declaredColumns(head, n.end));
         continue;
       }
 
@@ -449,6 +407,7 @@ export function buildModel(migrations, opts = {}) {
         if (!t) continue;
         const rest = head.slice(n.end);
         const restFlat = flat.slice(n.end);
+        alterColumns(t, rest, { file, line, order: coverage.statements });
         // Multiple actions can be comma-separated; the last word on RLS wins.
         const rlsActions = [...restFlat.matchAll(/\b(ENABLE|DISABLE)\s+ROW\s+LEVEL\s+SECURITY\b/gi)];
         if (rlsActions.length) t.rls = rlsActions[rlsActions.length - 1][1].toUpperCase() === 'ENABLE';
@@ -626,12 +585,11 @@ export function buildModel(migrations, opts = {}) {
         if (!forRole && roleChanged && isRevoke) continue;
         const roleText = isRevoke ? (/\bFROM\s+([\s\S]*)$/i.exec(head)?.[1] ?? '') : (/\bTO\s+([\s\S]*)$/i.exec(head)?.[1] ?? '');
         const roles = rolesIn(roleText);
-        const privs = parsePrivs(action[2]).table;
+        const privs = parsePrivileges(action[2]).table;
         const inSchema = /\bIN\s+SCHEMA\s+/i.exec(head);
         const applyTables = (d) => {
-          for (const role of API_ROLES) {
-            // GRANT TO PUBLIC reaches every role; REVOKE FROM PUBLIC leaves a role's own grant alone.
-            if (isRevoke ? !roles[role] : !roles[role] && !roles.public) continue;
+          for (const role of grantees) {
+            if (!roles[role]) continue;
             for (const p of privs) isRevoke ? d[role].delete(p) : d[role].add(p);
           }
         };
@@ -665,13 +623,18 @@ export function buildModel(migrations, opts = {}) {
       // Revoking the grant option leaves the privilege itself in place.
       if (/^REVOKE\s+GRANT\s+OPTION\s+FOR\b/i.test(head)) continue;
       const isRevoke = acl[1].toUpperCase() === 'REVOKE';
-      const roleText = isRevoke ? (/\bFROM\s+([\s\S]*)$/i.exec(head)?.[1] ?? '') : (/\bTO\s+([\s\S]*)$/i.exec(head)?.[1] ?? '');
-      const roles = rolesIn(roleText);
+      // An identifier can itself contain ON, TO, or FROM. Leave every offset
+      // unchanged so names are still read from the original SQL.
+      const keywords = flat.replace(/"(?:""|[^"])*"/g, id => '_'.repeat(id.length));
+      const roleAt = (isRevoke ? /\bFROM\s+/i : /\bTO\s+/i).exec(keywords);
+      if (!roleAt) continue;
+      const roles = rolesIn(head.slice(roleAt.index + roleAt[0].length));
       if (!roles.public && !roles.anon && !roles.authenticated) continue;
-      const onAt = /\bON\b/i.exec(flat);
-      const privs = parsePrivs(head.slice(acl[0].length, onAt ? onAt.index : acl[0].length));
+      const onAt = /\bON\b/i.exec(keywords);
+      if (!onAt) continue;
+      const privs = parsePrivileges(head.slice(acl[0].length, onAt.index));
 
-      const onSchema = /\bON\s+SCHEMA\s+/i.exec(head);
+      const onSchema = /\bON\s+SCHEMA\s+/i.exec(keywords);
       if (onSchema) {
         // Only USAGE decides whether a role can reach objects in a schema.
         // REVOKE CREATE (the standard hardening line) changes nothing here.
@@ -679,7 +642,7 @@ export function buildModel(migrations, opts = {}) {
         for (const s of readNameList(head, onSchema.index + onSchema[0].length)) {
           const name = s.name.toLowerCase();
           const u = { ...usageOf(name) };
-          for (const r of ['public', ...API_ROLES]) if (roles[r]) u[r] = !isRevoke;
+          for (const r of grantees) if (roles[r]) u[r] = !isRevoke;
           schemaUsage.set(name, u);
         }
         continue;
@@ -690,13 +653,13 @@ export function buildModel(migrations, opts = {}) {
         if (roles.anon) f.anonExec = !isRevoke;
         if (roles.authenticated) f.authExec = !isRevoke;
       };
-      const allFns = /\bON\s+ALL\s+(FUNCTIONS|ROUTINES)\s+IN\s+SCHEMA\s+/i.exec(head);
+      const allFns = /\bON\s+ALL\s+(FUNCTIONS|ROUTINES)\s+IN\s+SCHEMA\s+/i.exec(keywords);
       if (allFns) {
         const schemas = new Set(readNameList(head, allFns.index + allFns[0].length).map((s) => s.name.toLowerCase()));
         for (const f of functions.values()) if (schemas.has(f.schema)) applyFn(f);
         continue;
       }
-      const onFn = /\bON\s+(FUNCTION|ROUTINE|PROCEDURE)\s+/i.exec(head);
+      const onFn = /\bON\s+(FUNCTION|ROUTINE|PROCEDURE)\s+/i.exec(keywords);
       if (onFn) {
         for (const ref of readFunctionList(head, onFn.index + onFn[0].length)) {
           for (const k of fnKeysFor(ref)) {
@@ -708,23 +671,19 @@ export function buildModel(migrations, opts = {}) {
       }
 
       // Table privileges: GRANT/REVOKE <privs> ON [TABLE] a, b | ON ALL TABLES IN SCHEMA s, t
-      if (/\bON\s+(?:ALL\s+)?(SEQUENCES?|TYPE|DOMAIN|LANGUAGE|DATABASE|FOREIGN|LARGE|TABLESPACE|PARAMETER)\b/i.test(head)) continue;
-      // A REVOKE of a column list doesn't remove a table-level grant; a GRANT of one does give access.
-      const effective = isRevoke ? privs.table : new Set([...privs.table, ...privs.column]);
-      if (effective.size === 0) continue;
+      if (/\bON\s+(?:ALL\s+)?(SEQUENCES?|TYPE|DOMAIN|LANGUAGE|DATABASE|FOREIGN|LARGE|TABLESPACE|PARAMETER)\b/i.test(keywords)) continue;
+      if (!privs.table.size && !privs.column.size) continue;
+      const location = { file, line, order: coverage.statements };
       const applyTable = (t) => {
-        for (const role of API_ROLES) {
-          if (isRevoke ? !roles[role] : !roles[role] && !roles.public) continue;
-          for (const p of effective) isRevoke ? t.privs[role].delete(p) : t.privs[role].add(p);
-        }
+        for (const role of grantees) if (roles[role]) changeTableAcl(t.acl[role], privs, isRevoke, location);
       };
-      const allTables = /\bON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+/i.exec(head);
+      const allTables = /\bON\s+ALL\s+TABLES\s+IN\s+SCHEMA\s+/i.exec(keywords);
       if (allTables) {
         const schemas = new Set(readNameList(head, allTables.index + allTables[0].length).map((s) => s.name.toLowerCase()));
         for (const t of tables.values()) if (schemas.has(t.schema)) applyTable(t);
         continue;
       }
-      const onTable = /\bON\s+(?:TABLE\s+)?/i.exec(head);
+      const onTable = /\bON\s+(?:TABLE\s+)?/i.exec(keywords);
       if (onTable) {
         for (const n of readNameList(head, onTable.index + onTable[0].length)) {
           const t = tables.get(tkey(n));
@@ -734,6 +693,9 @@ export function buildModel(migrations, opts = {}) {
     }
   }
 
+  for (const t of tables.values()) {
+    t.privs = Object.fromEntries(apiRoles.map(role => [role, effectivePrivileges(t, role)]));
+  }
   return { tables, functions, triggers, schemaUsage, exposedSchemas, defaults, coverage };
 }
 
