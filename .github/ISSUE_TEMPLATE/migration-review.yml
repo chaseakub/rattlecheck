@@ -1,0 +1,24 @@
+name: Share a migration review result
+description: Tell us whether RattleCheck changed an actual pull request.
+title: "Migration review result"
+body:
+  - type: markdown
+    attributes:
+      value: "This reply will be public. A one-line account is enough. Leave out private SQL, customer data, and details of unresolved security findings."
+  - type: dropdown
+    id: result
+    attributes:
+      label: What happened before merge?
+      options:
+        - I changed the migration after a finding.
+        - I reviewed the result and kept the migration as written.
+        - The check flagged access we intended to allow.
+        - The check could not review the migration.
+        - I tried it after merge.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: What informed your decision?
+      description: If useful, include a rule ID or a link to a public PR.
