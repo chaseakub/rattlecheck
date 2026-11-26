@@ -8,7 +8,7 @@ Can signed-out visitors read the names in your public directory **and** the emai
 
 At closing time, a good manager walks the building and rattles every door to make sure it's locked. rattlecheck does that for your app. It checks every table, function, and rule in your Supabase project the way someone on the outside would, tells you in plain English which doors are open, and gives you the exact fix.
 
-**On GitHub:** [Add the pull request check](https://github.com/chaseakub/rattlecheck-action#install). It reads your migration files with read-only repository access and marks the migration line when it finds a high or critical issue. [See the broad grant fail](https://github.com/chaseakub/rattlecheck/actions/runs/45845966343) and [the narrowed grant pass](https://github.com/chaseakub/rattlecheck/actions/runs/45846092556).
+[**Get the pull request check on GitHub Marketplace**](https://github.com/marketplace/actions/rattlecheck-for-supabase-migrations). It reads your migration files with read-only repository access and marks the migration line when it finds a high or critical issue. [See the broad grant fail](https://github.com/chaseakub/rattlecheck/actions/runs/45845966343) and [the narrowed grant pass](https://github.com/chaseakub/rattlecheck/actions/runs/45846092556).
 
 Run from your Supabase repo root with Node.js 20 or newer:
 
