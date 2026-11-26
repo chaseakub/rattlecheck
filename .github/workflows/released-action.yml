@@ -22,8 +22,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Demonstrate the grant before the fix
-        run: mv examples/public-directory/002_narrow_reads.sql "$RUNNER_TEMP/"
       - uses: chaseakub/rattlecheck-action@v1
         with:
           working-directory: examples/public-directory

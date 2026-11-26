@@ -8,7 +8,7 @@ Can signed-out visitors read the names in your public directory **and** the emai
 
 At closing time, a good manager walks the building and rattles every door to make sure it's locked. rattlecheck does that for your app. It checks every table, function, and rule in your Supabase project the way someone on the outside would, tells you in plain English which doors are open, and gives you the exact fix.
 
-**On GitHub:** [Add the pull request check](https://github.com/chaseakub/rattlecheck-action#install). It reads your migration files with read-only repository access and shows the results in the workflow run.
+**On GitHub:** [Add the pull request check](https://github.com/chaseakub/rattlecheck-action#install). It reads your migration files with read-only repository access and marks the migration line when it finds a high or critical issue. [See a failing check](https://github.com/chaseakub/rattlecheck/actions/runs/45845966343).
 
 Run from your Supabase repo root with Node.js 20 or newer:
 
@@ -134,6 +134,10 @@ Static checks read your migration files. The live check asks your running projec
 The project URL and public key are read from the environment, or from `.env`, `.env.local`, `.env.development` (`SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `VITE_SUPABASE_URL`, and the matching `..._ANON_KEY` or `..._PUBLISHABLE_KEY`). Keys are never printed or included in any report.
 
 ## In CI
+
+For a standard PR check, [copy the read-only workflow](https://github.com/chaseakub/rattlecheck-action/blob/v1/examples/rattlecheck.yml) into `.github/workflows/rattlecheck.yml`. It fetches `rattlecheck@latest`. [Tell us whether it changed a migration you reviewed](https://github.com/chaseakub/rattlecheck/issues/new?template=migration-review.yml).
+
+To upload SARIF to GitHub code scanning, use this workflow instead:
 
 ```yaml
 # .github/workflows/rattlecheck.yml
