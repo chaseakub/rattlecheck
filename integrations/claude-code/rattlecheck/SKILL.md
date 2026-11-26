@@ -1,11 +1,11 @@
 ---
 name: rattlecheck
-description: Check a Supabase project for open doors (tables anyone can read, functions anyone can call with full database powers, policies that let anyone change every row) before deploying, and fix them with a new migration. Use before any deploy of a Supabase app, after writing or changing migrations, or when the user asks whether their app or data is secure.
+description: Review local Supabase SQL migrations before merge or deploy. Use RattleCheck to check row-level security policies, column grants, SQL functions and triggers, and explain findings to the reviewer.
 ---
 
 # rattlecheck: rattle every door before you ship
 
-rattlecheck replays `supabase/migrations` and grades the project A to F. It never changes the database.
+RattleCheck replays the project's local SQL migration history. Findings may originate on an older migration. Use the reported file and line to explain what the current PR changes.
 
 ## When to run it
 
@@ -20,12 +20,12 @@ rattlecheck replays `supabase/migrations` and grades the project A to F. It neve
    npx rattlecheck@latest --json
    ```
    Or call the `scan` tool if the rattlecheck MCP server is connected.
-2. For each finding, read `plain` (what's wrong, in plain words), `todo`, and `fix` (SQL).
-3. Put the fixes in a **new** migration file, for example `supabase/migrations/<timestamp>_rattlecheck_fixes.sql`.
+2. Read `coverage.tables` and `doors.checked` before interpreting the result. Zero tables gives no evidence about column permissions. For each finding, read `plain` (what's wrong, in plain words), `todo`, and `fix` (SQL).
+3. For a review request, report the results and suggested changes. If the user requests a fix, put it in a **new** migration file, for example `supabase/migrations/<timestamp>_rattlecheck_fixes.sql`.
    - Never edit a migration that has already run.
    - Never run SQL against a production database yourself.
    - Read each fix before using it. Fixes that turn on row-level security may need a policy so the app keeps working; write one scoped to the row's owner.
-4. Run rattlecheck again. Repeat until the grade is **A**.
+4. After an authorized change, rerun the check and say which finding cleared and which warnings remain. An intentional public read can leave a warning on a passing check.
 5. If a finding is intentional (a public menu, store hours), **ask the user** before adding an allow entry to `rattlecheck.config.json`:
    ```json
    { "allow": [{ "rule": "RC005", "object": "public.menu_items", "reason": "The menu is public on the website." }] }
@@ -39,4 +39,4 @@ rattlecheck replays `supabase/migrations` and grades the project A to F. It neve
 
 ## Exit codes
 
-`0` nothing open, `1` open door found, `2` usage or config error, `3` migrations could not be parsed (don't trust the result), `4` live check refused.
+`0` no high or critical findings (warnings can remain), `1` high or critical findings, `2` usage or config error, `3` incomplete coverage, `4` live check refused.

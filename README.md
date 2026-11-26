@@ -79,10 +79,18 @@ claude mcp add rattlecheck -- npx -y rattlecheck@latest mcp
 
 Tools: `scan` (grade, plain-English findings, fix SQL), `explain_rule`, `list_rules`. The server tells the agent to put fixes in a new migration, never to run SQL against production, and never to silence a finding without asking you.
 
-Prefer instructions over a server? Drop in one of these:
-- Claude Code skill: [`integrations/claude-code/rattlecheck/SKILL.md`](integrations/claude-code/rattlecheck/SKILL.md) (copy the folder into `.claude/skills/`)
-- `AGENTS.md` / `CLAUDE.md` section: [`integrations/AGENTS.md`](integrations/AGENTS.md)
-- Cursor rule: [`integrations/cursor/rattlecheck.mdc`](integrations/cursor/rattlecheck.mdc) (copy into `.cursor/rules/`)
+**Install the migration review skill** for Codex, Claude Code, or another supported agent:
+
+```sh
+npx skills add chaseakub/rattlecheck --skill rattlecheck
+```
+
+In a repo with Supabase migrations, ask your agent: “Review this migration PR with RattleCheck. Did the change affect who can read or write the data?” The skill uses the latest stable CLI. [Read the skill instructions](integrations/claude-code/rattlecheck/SKILL.md).
+
+Other project integrations:
+
+- [Instructions for AGENTS.md or CLAUDE.md](integrations/AGENTS.md)
+- [Cursor project rule](integrations/cursor/rattlecheck.mdc)
 
 ## Share your grade
 
