@@ -1,0 +1,29 @@
+name: Review the public directory with the released Action
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/released-action.yml'
+      - 'examples/public-directory/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/released-action.yml'
+      - 'examples/public-directory/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: RattleCheck migration review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Demonstrate the grant before the fix
+        run: mv examples/public-directory/002_narrow_reads.sql "$RUNNER_TEMP/"
+      - uses: chaseakub/rattlecheck-action@v1
+        with:
+          working-directory: examples/public-directory
