@@ -2,6 +2,8 @@
 
 Review Supabase SQL migrations for row-level security (RLS) policy mistakes and column grants before merging a PR. The CLI and MCP server read local migration files without production credentials.
 
+[**Review Supabase migrations locally with the CLI or MCP server**](https://chaseakub.github.io/rattlecheck/local-supabase-migration-review/). Get the client configuration, compare the base and head of a pull request, and see which column grants change.
+
 [**Would you ship this migration?**](https://chaseakub.github.io/rattlecheck/) Review nine lines of SQL, make the call, and see what happens when a customer hits Save. Try it in your browser.
 
 Can signed-out visitors read the names in your public directory **and** the email addresses you meant to keep private? [See the two grants side by side](https://chaseakub.github.io/rattlecheck/column-permissions/). [RC006](docs/rules/RC006.md) checks for this in your local Supabase migrations.
