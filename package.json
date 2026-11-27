@@ -1,6 +1,6 @@
 {
   "name": "rattlecheck",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Review Supabase SQL migrations for row-level security (RLS) and column grants with a local CLI, MCP server, or coding agent.",
   "mcpName": "io.github.chaseakub/rattlecheck-supabase-migration-review",
   "homepage": "https://github.com/chaseakub/rattlecheck#readme",
