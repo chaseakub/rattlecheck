@@ -1,0 +1,17 @@
+.guide {
+  max-width: 48rem;
+  padding-block: clamp(2.75rem, 7vw, 5.5rem);
+}
+.guide h1 { max-width: 16ch; font-size: clamp(2.65rem, 6vw, 4.5rem); }
+.guide .summary { font-size: 1.16rem; }
+.guide section { margin-top: 2.4rem; padding-top: 1.2rem; border-top: 1px solid var(--line); }
+.guide h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.7rem); letter-spacing: -.035em; }
+.guide p { line-height: 1.65; }
+.guide code { font: .92em/1.55 var(--mono); overflow-wrap: anywhere; }
+.guide pre {
+  padding: 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: .35rem;
+  background: white;
+}

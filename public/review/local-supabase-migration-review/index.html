@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f9f7">
+  <title>Local Supabase migration reviewer for RLS and column grants | RattleCheck</title>
+  <meta name="description" content="Review local Supabase SQL migrations before merge with RattleCheck. Use the CLI or MCP server to compare row-level security policies and column grants without a database connection.">
+  <link rel="canonical" href="https://chaseakub.github.io/rattlecheck/local-supabase-migration-review/">
+  <link rel="stylesheet" href="../review.css">
+  <link rel="stylesheet" href="./guide.css">
+  <link rel="sitemap" type="application/xml" href="../sitemap.xml">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the review guide</a>
+  <header class="mast">
+    <div class="wrap mast-inner">
+      <a class="brand" href="../"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>RattleCheck</a>
+      <a class="repo-link" href="https://github.com/chaseakub/rattlecheck">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main class="wrap guide" id="main">
+    <h1>Review Supabase migrations locally</h1>
+    <p class="summary">RattleCheck is an open-source local MCP server and CLI for Supabase migration review. It reads the PostgreSQL files in <code>supabase/migrations</code> in order and flags row-level security (RLS) mistakes and overly broad column grants before you merge.</p>
+
+    <section aria-labelledby="cli">
+      <h2 id="cli">Run it on a checkout</h2>
+      <p>From the repository root, run this command with Node.js 20 or newer. The first install fetches the package from npm. The static review itself works offline and requires no database credentials.</p>
+      <pre><code>npx rattlecheck@latest --json</code></pre>
+      <p>Start with <code>coverage.tables</code>. If it is zero, the scan gives you no evidence about table permissions. For each finding, the report gives the rule, object, migration file, and SQL line where available.</p>
+    </section>
+
+    <section aria-labelledby="mcp">
+      <h2 id="mcp">Use it from an MCP client</h2>
+      <p>Configure a local stdio server with the command <code>npx</code> and these arguments. Clients that use an <code>mcpServers</code> configuration accept this entry.</p>
+      <pre><code>{
+  "mcpServers": {
+    "rattlecheck": {
+      "command": "npx",
+      "args": ["-y", "rattlecheck@latest", "mcp"]
+    }
+  }
+}</code></pre>
+      <p>When the server starts in the repository root, this <code>tools/call</code> request reviews that checkout. If the client starts elsewhere, set <code>path</code> to the absolute project directory containing <code>supabase/migrations</code>.</p>
+      <pre><code>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "scan",
+    "arguments": { "path": ".", "live": false }
+  }
+}</code></pre>
+      <p><a href="https://registry.modelcontextprotocol.io/v0.1/servers?search=supabase-migration-review&amp;version=latest">Find the server in the official MCP Registry</a></p>
+    </section>
+
+    <section aria-labelledby="review">
+      <h2 id="review">What changed in the pull request?</h2>
+      <p>Scan the full migration history twice, once at the merge base and once at the PR head. Compare findings by rule, object, and affected field. An older grant can still apply after a later migration adds a column, so checking only the changed SQL can miss the reason a new field is readable.</p>
+      <p>In the public directory example, anonymous visitors should see a display name. A table-wide <code>SELECT</code> also gives them <code>private_email</code>. RattleCheck reports <strong>RC006</strong>. After the migration revokes the table grant and grants access to just <code>id</code> and <code>display_name</code>, RC006 clears. The warning about intentionally public rows remains. <a href="../column-permissions/">Compare the two grants and scanner reports</a>.</p>
+      <p>Review views, custom role memberships, and policies whose correctness depends on your business rules separately. Local files also cannot show changes made only in a hosted database. <a href="https://github.com/chaseakub/rattlecheck/blob/main/docs/rules/RC006.md">Read the column rule’s coverage</a>.</p>
+    </section>
+  </main>
+</body>
+</html>
