@@ -1,7 +1,8 @@
 {
   "name": "rattlecheck",
   "version": "0.3.0",
-  "description": "Rattle every door you own. Finds the open doors in your Supabase app before someone else does.",
+  "description": "Review Supabase SQL migrations for row-level security (RLS) and column grants with a local CLI, MCP server, or coding agent.",
+  "mcpName": "io.github.chaseakub/rattlecheck-supabase-migration-review",
   "homepage": "https://github.com/chaseakub/rattlecheck#readme",
   "repository": {
     "type": "git",
@@ -39,6 +40,10 @@
     "rls",
     "row-level-security",
     "postgres",
+    "postgresql",
+    "sql-migrations",
+    "column-grants",
+    "agent-skills",
     "scanner",
     "mcp",
     "sarif"
