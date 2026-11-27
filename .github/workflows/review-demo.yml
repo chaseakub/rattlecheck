@@ -5,6 +5,7 @@ on:
       - 'examples/order-audit/**'
       - 'examples/public-directory/**'
       - 'public/review/**'
+      - 'integrations/claude-code/rattlecheck/SKILL.md'
       - 'scripts/build-review-demo.mjs'
       - 'package.json'
       - 'src/**'
@@ -47,6 +48,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           path: _site
+          include-hidden-files: true
   publish:
     if: github.ref == 'refs/heads/main'
     needs: verify
