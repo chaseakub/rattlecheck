@@ -1,6 +1,6 @@
 # rattlecheck
 
-**Rattle every door you own.**
+Review Supabase SQL migrations for row-level security (RLS) policy mistakes and column grants before merging a PR. The CLI and MCP server read local migration files without production credentials.
 
 [**Would you ship this migration?**](https://chaseakub.github.io/rattlecheck/) Review nine lines of SQL, make the call, and see what happens when a customer hits Save. Try it in your browser.
 
@@ -65,7 +65,7 @@ Grades: **A** nothing open, **B** only things worth a look, **C** one high findi
 
 ## For coding agents
 
-rattlecheck has an MCP server built in. Connect it and your agent can check its own work before it ships, then write the fixes as a new migration.
+Search the [official MCP Registry for `supabase-migration-review`](https://registry.modelcontextprotocol.io/v0.1/servers?search=supabase-migration-review&version=latest). The server ID is `io.github.chaseakub/rattlecheck-supabase-migration-review`. Compatible MCP bundle clients can install the [local extension from the latest release](https://github.com/chaseakub/rattlecheck/releases/latest/download/rattlecheck.mcpb). With Node.js 20 or newer, you can also launch the same server with npm.
 
 **Claude Code**
 ```bash

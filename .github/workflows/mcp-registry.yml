@@ -1,0 +1,85 @@
+name: Publish the local Supabase MCP server
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/mcp-registry.yml'
+      - 'scripts/*mcp-bundle.py'
+  release:
+    types: [published]
+  workflow_dispatch:
+  # A GitHub release and its npm publication can land in either order.
+  schedule:
+    - cron: '37 6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Package and exercise npm latest
+        run: |
+          set -euo pipefail
+          tarball=$(npm pack --ignore-scripts --silent rattlecheck@latest --registry=https://registry.npmjs.org)
+          python3 scripts/build-mcp-bundle.py "$tarball" dist
+          python3 scripts/check-mcp-bundle.py dist/rattlecheck.mcpb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mcp-release
+          path: dist/
+          retention-days: 3
+
+  publish:
+    needs: bundle
+    if: github.repository == 'chaseakub/rattlecheck' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || (github.event_name == 'release' && !github.event.release.prerelease))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: publish-rattlecheck-registry
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mcp-release
+          path: dist
+      - name: Verify the current stable release and attach its MCP bundle
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version dist/server.json)
+          [[ "$version" == "$(npm view rattlecheck@latest version --registry=https://registry.npmjs.org)" ]]
+          digest=$(sha256sum dist/rattlecheck.mcpb | cut -d' ' -f1)
+          [[ "$digest" == "$(jq -r '.packages[0].fileSha256' dist/server.json)" ]]
+          gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,assets > release.json
+          jq -e '(.isDraft or .isPrerelease) | not' release.json > /dev/null
+          existing=$(jq -r '.assets[] | select(.name=="rattlecheck.mcpb") | .digest' release.json)
+          if [[ -z "$existing" ]]; then
+            gh release upload "v$version" dist/rattlecheck.mcpb --repo "$GITHUB_REPOSITORY"
+          else
+            [[ "$existing" == "sha256:$digest" ]] || { echo "Existing release asset differs; inspect before publishing." >&2; exit 1; }
+          fi
+          server=$(jq -r '.name|@uri' dist/server.json)
+          status=$(curl -sS --retry 2 -o entry.json -w '%{http_code}' "https://registry.modelcontextprotocol.io/v0.1/servers/$server/versions/$version")
+          case "$status" in
+            200) jq -e --arg sha "$digest" '.server.packages | any(.fileSha256 == $sha)' entry.json > /dev/null ;;
+            404) echo 'publish=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo "MCP Registry returned HTTP $status" >&2; exit 1 ;;
+          esac
+      - name: Publish with GitHub's short-lived registry identity
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o publisher.tgz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.20/mcp-publisher_linux_amd64.tar.gz
+          echo 'f190a1a2e86d424b63380737bf5b259a7ec2a41df223e507692ea9ed579eda68  publisher.tgz' | sha256sum -c -
+          tar xzf publisher.tgz mcp-publisher
+          ./mcp-publisher validate dist/server.json
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish dist/server.json
