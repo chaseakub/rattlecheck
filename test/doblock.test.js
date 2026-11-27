@@ -451,3 +451,39 @@ test('V1: built-in casts, as pg_dump writes them, do not spoil a block', async (
     END $$;`);
   assert.deepEqual(ids(r), []);
 });
+
+// Found in the 2026-11 pilot: a quarter of the "callable by anyone" findings
+// came from projects that lock their functions with this exact loop.
+test('a FOREACH over a written-out list runs its body once per name', async () => {
+  const loop = (list) => `DO $$ DECLARE fn text; BEGIN
+    FOREACH fn IN ARRAY ARRAY[${list}] LOOP
+      EXECUTE format('revoke all on function public.%s from public, anon', fn);
+      EXECUTE format('grant execute on function public.%s to authenticated', fn);
+    END LOOP;
+  END $$;`;
+  const r = await scanSql(`${DEF('f')}\n${DEF('g')}\n${loop(`'f(uuid)', 'g(uuid)'`)}`);
+  assert.deepEqual(ids(r), []);
+  // Only the names in the list are closed.
+  const partial = await scanSql(`${DEF('f')}\n${DEF('g')}\n${loop(`'f(uuid)'`)}`);
+  assert.deepEqual(ids(partial), ['RC002 public.g(uuid)']);
+});
+
+test('a FOREACH that is not a plain list, or whose body decides anything, stays uncertain', async () => {
+  for (const shape of [
+    `FOREACH fn IN ARRAY arr LOOP EXECUTE format('revoke all on function public.%s from public, anon', fn); END LOOP;`,
+    `FOREACH fn IN ARRAY ARRAY['f(' || 'uuid)'] LOOP EXECUTE format('revoke all on function public.%s from public, anon', fn); END LOOP;`,
+    `FOREACH fn IN ARRAY ARRAY['f(uuid)'] LOOP IF false THEN EXECUTE format('revoke all on function public.%s from public, anon', fn); END IF; END LOOP;`,
+    `FOREACH fn IN ARRAY ARRAY['f(uuid)'] LOOP EXIT; EXECUTE format('revoke all on function public.%s from public, anon', fn); END LOOP;`,
+  ]) {
+    const r = await scanSql(`${DEF()}\nDO $$ DECLARE fn text; arr text[] := ARRAY['f(uuid)']; BEGIN ${shape} END $$;`);
+    assert.deepEqual(ids(r), ['RC002 public.f(uuid)'], shape);
+  }
+  // Inside an IF the unrolled statements are no more certain than the loop was.
+  const guarded = await scanSql(`${DEF()}\nDO $$ DECLARE fn text; BEGIN IF current_setting('x', true) = 'y' THEN FOREACH fn IN ARRAY ARRAY['f(uuid)'] LOOP EXECUTE format('revoke all on function public.%s from public, anon', fn); END LOOP; END IF; END $$;`);
+  assert.deepEqual(ids(guarded), ['RC002 public.f(uuid)']);
+  // A GRANT in the loop opens the door again. Before the unroll, this hole was invisible.
+  const opens = await scanSql(`create function public.f(uid uuid) returns int language sql security definer set search_path = '' as $$ select 1 $$;
+revoke all on function public.f(uuid) from public, anon;
+DO $$ DECLARE fn text; BEGIN FOREACH fn IN ARRAY ARRAY['f(uuid)'] LOOP EXECUTE format('grant execute on function public.%s to anon', fn); END LOOP; END $$;`);
+  assert.deepEqual(ids(opens), ['RC002 public.f(uuid)']);
+});

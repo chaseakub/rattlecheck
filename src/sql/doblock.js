@@ -215,6 +215,61 @@ function parseDo(stmt) {
   return body;
 }
 
+// The most common way a project locks a list of functions:
+//
+//     FOREACH fn IN ARRAY ARRAY['f(uuid)', 'g()'] LOOP
+//       EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM public, anon', fn);
+//     END LOOP;
+//
+// A loop over a written-out list of string literals runs its body once per
+// element, in order, with nothing to decide. That is exactly the same as
+// assigning the variable and writing the body out each time, so the loop is
+// rewritten that way and the usual rules then judge each statement (a loop
+// inside an IF stays uncertain, an unknown EXECUTE still stops the replay).
+// Only the plainest shape is rewritten: every element a plain '...' literal,
+// and a body with no nested control flow, early exit or block of its own.
+// Anything else is left as a loop, which the reader treats as uncertain.
+const LOOP_BODY_CONTROL = /\b(LOOP|IF|CASE|FOR|FOREACH|WHILE|EXIT|CONTINUE|RETURN|BEGIN|DECLARE|EXCEPTION|END)\b/i;
+export function unrollForeach(body) {
+  const flat = blankQuoted(blankLiterals(body));
+  const head = /\bFOREACH\s+([A-Za-z_][A-Za-z0-9_]*)\s+IN\s+ARRAY\s+ARRAY\s*\[/gi;
+  let out = '';
+  let from = 0;
+  let m;
+  while ((m = head.exec(flat))) {
+    const close = flat.indexOf(']', head.lastIndex);
+    if (close === -1) break;
+    // The elements: plain literals separated by commas, nothing else.
+    const values = [];
+    let i = head.lastIndex;
+    let ok = true;
+    for (;;) {
+      while (i < close && /\s/.test(body[i])) i++;
+      if (body[i] !== "'") { ok = false; break; }
+      const end = quotedEnd(body, i);
+      if (end > close) { ok = false; break; }
+      values.push(body.slice(i, end));
+      i = end;
+      while (i < close && /\s/.test(body[i])) i++;
+      if (i === close) break;
+      if (body[i] !== ',') { ok = false; break; }
+      i++;
+    }
+    const loop = /^\s*LOOP\b/i.exec(flat.slice(close + 1));
+    if (!ok || !values.length || !loop) continue;
+    const bodyStart = close + 1 + loop[0].length;
+    const endLoop = /\bEND\s+LOOP\s*;/i.exec(flat.slice(bodyStart));
+    if (!endLoop) continue;
+    const inner = body.slice(bodyStart, bodyStart + endLoop.index);
+    if (LOOP_BODY_CONTROL.test(flat.slice(bodyStart, bodyStart + endLoop.index))) continue;
+    const v = m[1];
+    out += body.slice(from, m.index) + values.map((lit) => `${v} := ${lit};\n${inner}\n`).join('');
+    from = bodyStart + endLoop.index + endLoop[0].length;
+    head.lastIndex = from;
+  }
+  return out + body.slice(from);
+}
+
 // Where the dynamic command ends: EXECUTE <command> [INTO ...] [USING ...].
 function commandText(rest) {
   const flat = blankLiterals(rest);
@@ -337,8 +392,9 @@ export function reopens(sql) {
  */
 export function replayableFromDo(stmt, { currentUser = 'postgres', isUserFunction = () => false } = {}) {
   if (!/^DO\b/i.test(stmt)) return null;
-  const body = parseDo(stmt);
-  if (body === null) return null;
+  const parsed = parseDo(stmt);
+  if (parsed === null) return null;
+  const body = unrollForeach(stripComments(parsed));
 
   const ctx = { currentUser, vars: new Map() };
   const stack = []; // open constructs: block | nested | handler | if | case | loop
