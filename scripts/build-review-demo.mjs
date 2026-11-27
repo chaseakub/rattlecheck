@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +42,24 @@ const data = {
 };
 await mkdir(output, { recursive: true });
 await cp(path.join(project, 'public/review'), output, { recursive: true });
+// Publish the same skill that repository installs use. Its digest covers the exact bytes served.
+const skill = await readFile(path.join(project, 'integrations/claude-code/rattlecheck/SKILL.md'));
+const frontmatter = /^---\r?\n([\s\S]+?)\r?\n---\r?\n/.exec(skill.toString('utf8'))?.[1];
+assert.ok(frontmatter, 'Expected YAML frontmatter in SKILL.md');
+const name = /^name: (rattlecheck)\r?$/m.exec(frontmatter)?.[1];
+const description = /^description: ([^\r\n]+)\r?$/m.exec(frontmatter)?.[1];
+assert.ok(name && description && !/^[|>]/.test(description), 'Expected the skill name and a single-line description');
+const discovery = path.join(output, '.well-known/agent-skills');
+await mkdir(path.join(discovery, name), { recursive: true });
+await writeFile(path.join(discovery, name, 'SKILL.md'), skill);
+const index = {
+  $schema: 'https://schemas.agentskills.io/discovery/0.2.0/schema.json',
+  skills: [{
+    name, description, type: 'skill-md', url: `${name}/SKILL.md`,
+    digest: `sha256:${createHash('sha256').update(skill).digest('hex')}`,
+  }],
+};
+await writeFile(path.join(discovery, 'index.json'), JSON.stringify(index, null, 2) + '\n');
 await writeFile(path.join(output, 'case.json'), JSON.stringify(data, null, 2) + '\n');
 console.log(`RattleCheck ${VERSION}: ${before.findings[0].rule} / grade ${data.before.grade}, then grade ${data.after.grade}.`);
 

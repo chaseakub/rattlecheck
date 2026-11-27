@@ -17,6 +17,7 @@
   <meta name="twitter:description" content="A customer edits an order. Review the SQL and call the outcome.">
   <meta name="twitter:image" content="https://chaseakub.github.io/rattlecheck/preview.png">
   <link rel="stylesheet" href="./review.css">
+  <link rel="related" type="application/json" title="RattleCheck agent skill index" href="./.well-known/agent-skills/index.json">
   <script src="./review.js" defer></script>
 </head>
 <body>
@@ -90,6 +91,7 @@
         <h2 id="try-title">Check your own migrations</h2>
         <p>Run from your project root. The default check reads local SQL files.</p>
         <p><a href="https://github.com/chaseakub/rattlecheck-action#install">Add the check to your GitHub pull requests</a></p>
+        <p><a href="https://github.com/chaseakub/rattlecheck#for-coding-agents">Install the migration review skill for coding agents</a></p>
       </div>
       <button id="install" class="command" type="button" disabled aria-label="Copy install command"><code id="command">npx rattlecheck@latest</code> <span aria-hidden="true">Copy</span></button>
     </section>
