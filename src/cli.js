@@ -21,6 +21,7 @@ Usage
 Options
   --technical         file locations, standards, and the exact SQL fix for each finding
   --json              machine-readable report (schema rattlecheck.report/v1)
+  --format json       compact findings with high, medium and low counts
   --sarif             SARIF 2.1.0 report, for GitHub code scanning and security tools
   --out <file>        write the --json or --sarif report to a file instead of the screen
   --badge [file]      write a README badge         (default: rattlecheck-badge.svg)
@@ -54,6 +55,11 @@ function parseArgs(argv) {
     switch (a) {
       case '--technical': opts.technical = true; break;
       case '--json': opts.json = true; break;
+      case '--format':
+        if (argv[++i] !== 'json') throw new ScanError('--format expects json.');
+        opts.json = true;
+        opts.compact = true;
+        break;
       case '--sarif': opts.sarif = true; break;
       case '--live': opts.live = true; break;
       case '--publish': opts.publish = true; break;
@@ -89,6 +95,19 @@ function renderFixSql(report) {
   }
   if (!report.findings.length) lines.push('-- Nothing to fix.');
   return `${lines.join('\n')}\n`;
+}
+
+function compactReport(report) {
+  const severityTier = { critical: 'high', high: 'high', warning: 'medium', medium: 'medium', low: 'low', info: 'low' };
+  const summary = { high: 0, medium: 0, low: 0, total: report.findings.length };
+  const findings = report.findings.map(finding => {
+    const severity = severityTier[finding.severity];
+    if (!severity) throw new Error('Unknown finding severity: ' + finding.severity);
+    summary[severity]++;
+    return { ruleId: finding.rule, severity, file: finding.file ?? null, line: finding.line ?? null,
+      message: finding.message, suggestion: finding.todo };
+  });
+  return { version: report.tool.version, summary, findings, checked: report.doors.checked, coverageOK: report.coverage.ok };
 }
 
 function explain(rule) {
@@ -144,7 +163,8 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
     if (opts.fixSql) write(opts.fixSql, renderFixSql(report));
 
     if (opts.json || opts.sarif) {
-      const body = `${JSON.stringify(opts.json ? report : renderSarif(report), null, 2)}\n`;
+      const output = opts.compact ? compactReport(report) : opts.json ? report : renderSarif(report);
+      const body = `${JSON.stringify(output, null, 2)}\n`;
       if (opts.out) write(opts.out, body);
       else stdout.write(body);
     } else {

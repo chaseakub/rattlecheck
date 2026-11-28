@@ -85,6 +85,30 @@ function sink() {
   return s;
 }
 
+test('compact JSON is pure stdout on interactive terminals and preserves the exit verdict', async t => {
+  const root = project(BAD);
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const stdout = sink();
+  stdout.isTTY = true;
+  const stderr = sink();
+  assert.equal(await main([root, '--format', 'json'], { stdout, stderr, env: {} }), 1);
+  assert.equal(stderr.text, '');
+  const report = JSON.parse(stdout.text);
+  assert.match(report.version, /^\d+\.\d+\.\d+/);
+  assert.equal(report.coverageOK, true);
+  assert.ok(report.summary.high > 0);
+  assert.equal(report.summary.total, report.findings.length);
+  for (const finding of report.findings) {
+    assert.match(finding.ruleId, /^RC\d+$/);
+    assert.ok(['high','medium','low'].includes(finding.severity));
+    assert.equal(finding.file, 'supabase/migrations/0001.sql');
+    assert.ok(finding.line >= 1 && finding.message && finding.suggestion);
+  }
+  const help = sink();
+  assert.equal(await main([root, '--format', 'xml'], { stdout: help, stderr, env: {} }), 2);
+  assert.equal(help.text, '');
+});
+
 test('CLI exit codes: 1 for open doors, 0 for clean, 2 for no migrations', async () => {
   const bad = project(BAD);
   const good = project(`create table public.a (id int); alter table public.a enable row level security;`);
