@@ -178,14 +178,12 @@ Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3
 ```json
 {
   "defaults": "supabase-stock",
-  "allow": [
-    { "rule": "RC005", "object": "public.menu_items", "reason": "The menu is public on the website." }
-  ]
+  "allow": []
 }
 ```
 
 - **`publish`**: `true` lets the public badge service grade this repository (see [Publish a public grade](#publish-a-public-grade)). Leave it out and nothing is ever published. **`publishDirs`** does the same for projects in subfolders, and only counts in the config at the top of the repository.
-- **`allow`**: some doors are meant to be open, like a public menu. Every entry needs a written reason. Entries that no longer match anything are reported, so an old exception can't quietly cover something new.
+- Each **`allow`** entry has a `rule`, an `object`, and a written `reason`. Allowing RC005 on `public.menu_items` suppresses that rule on the whole table, including future write policies. Leave an intentional public read warning visible to keep those write checks active. RattleCheck reports entries that match no current finding.
 - **`defaults`**: rattlecheck assumes Supabase's stock privileges, where new tables and functions in `public` are open to `anon` and `authenticated` until you revoke them. A baseline that revokes those defaults inside a `DO` block is followed when the statement is certain to run and its text can be worked out (string literals, `format()`, `current_user`). If yours builds the revoke some other way, set `"clean"`, or `{ "functions": "clean", "tables": "supabase-stock" }`.
 - **`exposedSchemas`**: read from `supabase/config.toml` (`[api] schemas`) by default.
 - **`privateColumns`** lists fields that signed-out visitors should never read. For example, `"privateColumns": {"public.directory": ["draft_budget"]}` makes anonymous access to that field a high finding.

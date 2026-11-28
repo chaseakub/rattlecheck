@@ -28,7 +28,7 @@ const TOOLS = [
     name: 'scan',
     title: 'Scan a Supabase project',
     description:
-      'Replays the project\'s supabase/migrations and reports every open door: tables without row-level security, SECURITY DEFINER functions anyone can call, unpinned search paths, triggers that break user writes, always-true policies, and anonymous SELECT grants that expose private columns. Returns a grade (A to F), each finding in plain English, and the SQL to fix it. Read-only. With live=true it also asks the running project, read-only and only after proving the user owns it, how many rows each table hands to the public key.',
+      'Replays the project\'s supabase/migrations and reports every open door: tables without row-level security, SECURITY DEFINER functions anyone can call, unpinned search paths, triggers that break user writes, always-true policies, and anonymous SELECT grants that expose private columns. Returns a grade (A to F), each finding in plain English, and suggested SQL or review guidance. Read-only. With live=true it also asks the running project, read-only and only after proving the user owns it, how many rows each table hands to the public key.',
     inputSchema: {
       type: 'object',
       properties: {
