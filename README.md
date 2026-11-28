@@ -171,6 +171,8 @@ Exit codes: `0` nothing open, `1` open door found, `2` usage or config error, `3
 
 `--json` prints a stable, versioned report (`rattlecheck.report/v1`). `--sarif` prints SARIF 2.1.0 for GitHub code scanning and other security tools. `--fix-sql` writes every suggested fix to one file for review.
 
+For a smaller machine-readable report, run `rattlecheck --format json`. Its `summary` counts high, medium, low and total findings. Each finding includes `ruleId`, `severity`, `file`, `line`, `message` and `suggestion`. Critical and high scanner findings count as high, and warnings count as medium. The report also includes the scanner version, the number of objects checked, and whether the SQL scan completed. A scan that finds a high-severity issue still prints valid JSON and exits with status 1.
+
 ## Config
 
 `rattlecheck.config.json` in your project folder:
