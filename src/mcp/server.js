@@ -18,9 +18,9 @@ const INSTRUCTIONS = `rattlecheck finds security holes in Supabase projects: tab
 
 How to use it:
 1. Call scan on the project folder before you deploy, and after any migration that creates or changes tables, policies, functions, or grants.
-2. For each finding, put its fix SQL into a NEW migration file. Never edit migrations that already ran. Never run SQL against a production database yourself.
-3. Call scan again until the grade is A.
-4. If a finding is intentional (a public menu, say), ask the user before adding an allow entry with a reason to rattlecheck.config.json. Never allow a finding just to make it go away.
+2. Review the suggested fix. When a database change is needed, put the reviewed SQL into a NEW migration file. Never edit migrations that already ran. Never run SQL against a production database yourself.
+3. Scan again after changes. An intentional public read can remain a warning after review.
+4. If the user wants an allow entry, explain that it covers the rule on the whole object and confirm the reason before adding it to rattlecheck.config.json.
 5. Tell the user what was found in plain words, using each finding's "plain" text.`;
 
 const TOOLS = [
@@ -58,7 +58,7 @@ const TOOLS = [
 function summarize(report) {
   const lines = [`Grade ${report.grade.letter} (${report.grade.label}). ${report.doors.checked} doors checked, ${report.doors.open} open.`];
   for (const f of report.findings) {
-    lines.push('', `[${f.severity.toUpperCase()}] ${f.rule} ${f.name}${f.detail ? ` (${f.detail})` : ''}`, f.plain, `What to do: ${f.todo}`, `Location: ${f.file ?? 'live project'}${f.line ? `:${f.line}` : ''}`, 'Fix SQL (put in a NEW migration):', f.fix);
+    lines.push('', `[${f.severity.toUpperCase()}] ${f.rule} ${f.name}${f.detail ? ` (${f.detail})` : ''}`, f.plain, `What to do: ${f.todo}`, `Location: ${f.file ?? 'live project'}${f.line ? `:${f.line}` : ''}`, 'Fix SQL or review note:', f.fix);
   }
   if (!report.coverage.ok) lines.push('', 'WARNING: migration files were found but nothing could be parsed. Do not trust this result.');
   if (report.live.ran && !report.live.coverage.complete) {

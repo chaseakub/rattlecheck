@@ -12,9 +12,9 @@ export default {
   id: 'RC005',
   target: 'supabase',
   severity: 'high',
-  title: 'Policy lets anyone change every row',
+  title: 'Permissive row policy has an always-true condition',
   summary:
-    'Row-level security only protects a table as well as its policies do. A permissive policy whose condition is simply true lets every matching role touch every row, which turns RLS back off for that action.',
+    'An always-true condition admits every row it evaluates for the matching role and command. Check the policy alongside column grants and any restrictive policies.',
   standards: { cwe: ['CWE-732'], nist80053: ['AC-3', 'AC-6'], cis: ['3.3'] },
 
   check(model) {
@@ -54,7 +54,7 @@ export default {
         const who = forAnon ? 'Anyone on the internet' : 'Anyone who signs up for your app';
         const action = { ALL: 'read, add, change and delete', UPDATE: 'change', DELETE: 'delete' }[p.cmd];
         const owner = '(select auth.uid()) = user_id';
-        const clause = { SELECT: `using (${owner})`, DELETE: `using (${owner})`, INSERT: `with check (${owner})`, UPDATE: `using (${owner}) with check (${owner})`, ALL: `using (${owner}) with check (${owner})` }[p.cmd];
+        const clause = { DELETE: `using (${owner})`, INSERT: `with check (${owner})`, UPDATE: `using (${owner}) with check (${owner})`, ALL: `using (${owner}) with check (${owner})` }[p.cmd];
         const ref = qualified(t.schema, t.name);
         const plain = {
           change: `${who} can ${action} any row in the "${t.name}" table, including other people's. The rule "${p.name}" allows it for every row.`,
@@ -66,9 +66,10 @@ export default {
           change: 'Replace this rule with one that only lets people touch their own rows.',
           add: 'If this is a public form, mark it as allowed in rattlecheck.config.json with a reason. If rows belong to users, check that the new row is theirs.',
           claim: 'Add a WITH CHECK that matches the USING, so a saved row still belongs to the person saving it.',
-          read: 'Confirm the readable columns are intended for public use. If the public row policy is intentional, allow RC005 with a reason.',
+          read: 'Review which rows and columns signed-out visitors should see. If this access is intended, no migration is needed.',
         }[kind];
         findings.push({
+          title: kind === 'read' ? 'SELECT policy permits signed-out reads on every row' : `Permissive ${p.cmd} policy has an always-true condition`,
           object: `table:${t.key}`,
           name: t.key,
           detail: p.name,
@@ -78,7 +79,9 @@ export default {
           message: `Policy "${p.name}" on ${t.key} is permissive FOR ${p.cmd} TO ${p.roles.join(', ')} with an always-true condition.`,
           plain,
           todo,
-          fix: `drop policy ${quoteIdent(p.name)} on ${ref};\n-- Replace it with a rule scoped to the row's owner, for example:\n-- create policy ${quoteIdent(p.name)} on ${ref} for ${p.cmd.toLowerCase()} to authenticated ${clause};`,
+          fix: kind === 'read'
+            ? `-- ${todo}`
+            : `drop policy ${quoteIdent(p.name)} on ${ref};\n-- Replace it with a rule scoped to the row's owner, for example:\n-- create policy ${quoteIdent(p.name)} on ${ref} for ${p.cmd.toLowerCase()} to authenticated ${clause};`,
         });
       }
     }

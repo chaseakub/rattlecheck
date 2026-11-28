@@ -11,6 +11,17 @@ const narrow = fixture('002_narrow_reads.sql');
 const config = { defaults: 'clean', allow: [{ rule: 'RC005', object: 'public.directory', reason: 'Directory entries are publicly listed.' }] };
 const columns = report => report.findings.filter(f => f.rule === 'RC006' && f.detail).map(f => f.name);
 
+test('a public directory read policy gets read guidance without executable changes', async () => {
+  const report = await scanSql(wide + narrow, { config: { defaults: 'clean' } });
+  assert.deepEqual(report.findings.map(f => f.rule), ['RC005']);
+  const [read] = report.findings;
+  assert.equal(read.severity, 'warning');
+  assert.match(read.title, /signed-out reads/i);
+  assert.match(read.plain, /display_name, id/);
+  assert.match(read.todo, /no migration is needed/i);
+  assert.ok(read.fix.trim().split('\n').every(line => line.startsWith('-- ')));
+});
+
 test('public row exception cannot hide a table-wide grant on private_email', async () => {
   const before = await scanSql(wide, { config });
   assert.deepEqual(columns(before), ['public.directory.private_email']);

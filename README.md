@@ -57,7 +57,7 @@ Every rule in rattlecheck comes from a real incident in a production app:
 | [RC002](docs/rules/RC002.md) | A `SECURITY DEFINER` function anyone can call | critical |
 | [RC003](docs/rules/RC003.md) | A `SECURITY DEFINER` function without a pinned `search_path` | high |
 | [RC004](docs/rules/RC004.md) | A trigger that runs with the user's rights and writes to a server-only table, so user saves fail | high |
-| [RC005](docs/rules/RC005.md) | A policy whose condition is just `true`, letting anyone change every row | high |
+| [RC005](docs/rules/RC005.md) | A permissive row policy with an always-true condition on reads or writes | high or warning |
 | [RC006](docs/rules/RC006.md) | Anonymous SELECT on public rows includes a private field or covers all current and future columns | high or warning |
 | [RC101](docs/rules/RC101.md) | **Live:** a table on your running project that hands rows to the public key | critical |
 
