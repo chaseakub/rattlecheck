@@ -167,6 +167,10 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
     }
 
     if (!report.coverage.ok) return 3;
+    if (stdout.isTTY && !env.CI && !opts.json && !opts.sarif && report.doors.checked > 0) {
+      stdout.write('Did this check change your migration? You can share the outcome publicly on GitHub.\n');
+      stdout.write('https://github.com/chaseakub/rattlecheck/issues/new?template=migration-review.yml\n');
+    }
     return report.counts.critical + report.counts.high > 0 ? 1 : 0;
   } catch (e) {
     if (e instanceof ScanError || e instanceof ConfigError || e instanceof PublishFailed) {

@@ -154,6 +154,38 @@ test('CLI --fix-sql writes a reviewable file and never claims to apply it', asyn
   }
 });
 
+test('only completed interactive text scans offer the public migration outcome form', async () => {
+  const root = project(BAD);
+  const form = 'https://github.com/chaseakub/rattlecheck/issues/new?template=migration-review.yml';
+  try {
+    for (const [args, tty, env, expected] of [
+      [[], true, {}, true],
+      [[], false, {}, false],
+      [[], true, { CI: 'true' }, false],
+      [['--json'], true, {}, false],
+      [['--sarif'], true, {}, false],
+    ]) {
+      const out = sink();
+      out.isTTY = tty;
+      assert.equal(await main([root, ...args], { stdout: out, stderr: sink(), env }), 1);
+      assert.equal(out.text.includes(form), expected);
+    }
+    const sql = path.join(root, 'supabase', 'migrations', '0001.sql');
+    fs.writeFileSync(sql, 'create table public.menu (id int); alter table public.menu enable row level security;');
+    const clean = sink();
+    clean.isTTY = true;
+    assert.equal(await main([root], { stdout: clean, stderr: sink(), env: {} }), 0);
+    assert.ok(clean.text.includes(form));
+    fs.writeFileSync(sql, '-- Nothing to check');
+    const empty = sink();
+    empty.isTTY = true;
+    assert.equal(await main([root], { stdout: empty, stderr: sink(), env: {} }), 3);
+    assert.equal(empty.text.includes(form), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('CLI rejects unknown options', async () => {
   const err = sink();
   assert.equal(await main(['--frobnicate'], { stdout: sink(), stderr: err, env: {} }), 2);
